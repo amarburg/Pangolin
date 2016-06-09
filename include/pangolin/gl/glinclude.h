@@ -39,6 +39,10 @@ namespace pangolin {
 inline void _CheckGlDieOnError( const char *sFile, const int nLine )
 {
     GLenum glError = glGetError();
+#ifdef __APPLE__
+	// Mute this error specifically on OSX
+	if( glError == 1280 ) return;
+#endif
     if( glError != GL_NO_ERROR ) {
         pango_print_error( "OpenGL Error: %s (%d)\n", glErrorString(glError), glError );
 		pango_print_error("In: %s, line %d\n", sFile, nLine);
