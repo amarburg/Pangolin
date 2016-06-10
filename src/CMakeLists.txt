@@ -418,6 +418,13 @@ IF(MSVC)
     )
 ENDIF()
 
+IF(CMAKE_MACOSX_RPATH)
+	set_target_properties( ${LIBRARY_NAME}
+	   PROPERTIES
+	   INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib
+	   INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/lib )
+ENDIF()
+
 ## Set Special Compiler flags
 if(MSVC)
   set(CMAKE_CXX_FLAGS "/EHs ${CMAKE_CXX_FLAGS}")
