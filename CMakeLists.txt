@@ -41,8 +41,17 @@ if(ANDROID OR IOS)
     endif()
 endif()
 
-if(_OSX_)
-    set(CMAKE_MACOSX_RPATH ON)
+if(APPLE)
+	# https://cmake.org/Wiki/CMake_RPATH_handling
+	# CONAN GUIDE: All generated libraries should have the id and dependencies to other
+	# dylibs without path, just the name, EX:
+	# libMyLib1.dylib:
+	#     libMyLib1.dylib (compatibility version 0.0.0, current version 0.0.0)
+	#     libMyLib0.dylib (compatibility version 0.0.0, current version 0.0.0)
+	#     /usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 120.0.0)
+	#     /usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1197.1.1)
+	set(CMAKE_SKIP_RPATH 1)  # AVOID RPATH FOR *.dylib, ALL LIBS BETWEEN THEM AND THE EXE
+	# SHOULD BE ON THE LINKER RESOLVER PATH (./ IS ONE OF THEM)
 endif()
 
 # Overide with cmake -DCMAKE_BUILD_TYPE=Debug {dir}
