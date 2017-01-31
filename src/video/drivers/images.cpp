@@ -26,6 +26,8 @@
  */
 
 #include <pangolin/video/drivers/images.h>
+#include <pangolin/factory/factory_registry.h>
+#include <pangolin/video/iostream_operators.h>
 #include <pangolin/utils/file_utils.h>
 
 #include <cstring>
@@ -33,30 +35,32 @@
 namespace pangolin
 {
 
-bool ImagesVideo::QueueFrame()
+bool ImagesVideo::LoadFrame(size_t i)
 {
-    if(num_loaded < num_files) {
-        Frame frame;
+    if( (int)i < num_files) {
+        Frame& frame = loaded[i];
         for(size_t c=0; c< num_channels; ++c) {
-            const std::string& filename = Filename(num_loaded,c);
-            frame.push_back( LoadImage( filename ) );
+            const std::string& filename = Filename(i,c);
+            const ImageFileType file_type = FileType(filename);
+
+            if(file_type == ImageFileTypeUnknown && unknowns_are_raw) {
+                frame.push_back( LoadImage( filename, raw_fmt, raw_width, raw_height, raw_fmt.bpp * raw_width / 8) );
+            }else{
+                frame.push_back( LoadImage( filename, file_type ) );
+            }
         }
-        loaded.push_back(frame);
-        ++num_loaded;
         return true;
     }
     return false;
 }
 
-ImagesVideo::ImagesVideo(const std::string& wildcard_path)
-    : num_files(-1), num_channels(0),
-      num_loaded(0)
+void ImagesVideo::PopulateFilenames(const std::string& wildcard_path)
 {
     const std::vector<std::string> wildcards = Expand(wildcard_path, '[', ']', ',');
     num_channels = wildcards.size();
-    
+
     filenames.resize(num_channels);
-    
+
     for(size_t i = 0; i < wildcards.size(); ++i) {
         const std::string channel_wildcard = PathExpand(wildcards[i]);
         FilesMatchingWildcard(channel_wildcard, filenames[i]);
@@ -72,24 +76,57 @@ ImagesVideo::ImagesVideo(const std::string& wildcard_path)
             throw VideoException("No files found for wildcard '" + channel_wildcard + "'");
         }
     }
-    
-    // Load first image in order to determine stream sizes etc
-    QueueFrame();
-    
+
+    // Resize empty frames vector to hold future images.
+    loaded.resize(num_files);
+}
+
+void ImagesVideo::ConfigureStreamSizes()
+{
     size_bytes = 0;
     for(size_t c=0; c < num_channels; ++c) {
         const TypedImage& img = loaded[0][c];
         const StreamInfo stream_info(img.fmt, img.w, img.h, img.pitch, (unsigned char*)0 + size_bytes);
-        streams.push_back(stream_info);        
+        streams.push_back(stream_info);
         size_bytes += img.h*img.pitch;
     }
+}
+
+ImagesVideo::ImagesVideo(const std::string& wildcard_path)
+    : num_files(-1), num_channels(0), next_frame_id(0),
+      unknowns_are_raw(false)
+{
+    // Work out which files to sequence
+    PopulateFilenames(wildcard_path);
     
+    // Load first image in order to determine stream sizes etc
+    LoadFrame(next_frame_id);
+
+    ConfigureStreamSizes();
+    
+    // TODO: Queue frames in another thread.
+}
+
+ImagesVideo::ImagesVideo(const std::string& wildcard_path,
+                         const PixelFormat& raw_fmt,
+                         size_t raw_width, size_t raw_height
+)   : num_files(-1), num_channels(0), next_frame_id(0),
+      unknowns_are_raw(true), raw_fmt(raw_fmt),
+      raw_width(raw_width), raw_height(raw_height)
+{
+    // Work out which files to sequence
+    PopulateFilenames(wildcard_path);
+
+    // Load first image in order to determine stream sizes etc
+    LoadFrame(next_frame_id);
+
+    ConfigureStreamSizes();
+
     // TODO: Queue frames in another thread.
 }
 
 ImagesVideo::~ImagesVideo()
 {
-    
 }
 
 //! Implement VideoInput::Start()
@@ -117,29 +154,78 @@ const std::vector<StreamInfo>& ImagesVideo::Streams() const
 }
 
 //! Implement VideoInput::GrabNext()
-bool ImagesVideo::GrabNext( unsigned char* image, bool wait )
+bool ImagesVideo::GrabNext( unsigned char* image, bool /*wait*/ )
 {
-    QueueFrame();
-        
-    if(!loaded.size()) return false;
-    
-    Frame frame = loaded.front();
-    loaded.pop_front();
-            
-    for(size_t c=0; c < num_channels; ++c){
-        TypedImage& img = frame[c];
-        if(!img.ptr) return false;
-        const StreamInfo& si = streams[c];
-        std::memcpy(image + (size_t)si.Offset(), img.ptr, si.SizeBytes());
-        img.Dealloc();
+    if(next_frame_id < loaded.size()) {
+        Frame& frame = loaded[next_frame_id];
+
+        if(frame.size() != num_channels) {
+            LoadFrame(next_frame_id);
+        }
+
+        for(size_t c=0; c < num_channels; ++c){
+            TypedImage& img = frame[c];
+            if(!img.ptr || img.w != streams[c].Width() || img.h != streams[c].Height() ) {
+                return false;
+            }
+            const StreamInfo& si = streams[c];
+            std::memcpy(image + (size_t)si.Offset(), img.ptr, si.SizeBytes());
+            img.Deallocate();
+        }
+        frame.clear();
+
+        next_frame_id++;
+        return true;
     }
-    return true;
+    
+    return false;
 }
 
 //! Implement VideoInput::GrabNewest()
 bool ImagesVideo::GrabNewest( unsigned char* image, bool wait )
 {
     return GrabNext(image,wait);
+}
+
+int ImagesVideo::GetCurrentFrameId() const
+{
+    return (int)next_frame_id - 1;
+}
+
+int ImagesVideo::GetTotalFrames() const
+{
+    return num_files;
+}
+
+int ImagesVideo::Seek(int frameid)
+{
+    next_frame_id = std::max(0, std::min(frameid, num_files));
+    return (int)next_frame_id;
+}
+
+PANGOLIN_REGISTER_FACTORY(ImagesVideo)
+{
+    struct ImagesVideoVideoFactory : public FactoryInterface<VideoInterface> {
+        std::unique_ptr<VideoInterface> Open(const Uri& uri) override {
+            const bool raw = uri.Contains("fmt");
+            const std::string path = PathExpand(uri.url);
+
+            if(raw) {
+                const std::string sfmt = uri.Get<std::string>("fmt", "GRAY8");
+                const PixelFormat fmt = PixelFormatFromString(sfmt);
+                const ImageDim dim = uri.Get<ImageDim>("size", ImageDim(640,480));
+                return std::unique_ptr<VideoInterface>( new ImagesVideo(path, fmt, dim.x, dim.y) );
+            }else{
+                return std::unique_ptr<VideoInterface>( new ImagesVideo(path) );
+            }
+        }
+    };
+
+    auto factory = std::make_shared<ImagesVideoVideoFactory>();
+    FactoryRegistry<VideoInterface>::I().RegisterFactory(factory, 20, "file");
+    FactoryRegistry<VideoInterface>::I().RegisterFactory(factory, 20, "files");
+    FactoryRegistry<VideoInterface>::I().RegisterFactory(factory, 10, "image");
+    FactoryRegistry<VideoInterface>::I().RegisterFactory(factory, 10, "images");
 }
 
 }

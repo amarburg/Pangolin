@@ -25,21 +25,20 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PANGOLIN_VIDEO_JOIN_H
-#define PANGOLIN_VIDEO_JOIN_H
+#pragma once
 
 #include <pangolin/video/video.h>
 
 namespace pangolin
 {
 
-class PANGOLIN_EXPORT VideoJoiner
+class PANGOLIN_EXPORT JoinVideo
     : public VideoInterface, public VideoFilterInterface
 {
 public:
-    VideoJoiner(const std::vector<VideoInterface *> &src);
+    JoinVideo(std::vector<std::unique_ptr<VideoInterface>> &src);
 
-    ~VideoJoiner();
+    ~JoinVideo();
 
     size_t SizeBytes() const;
 
@@ -49,6 +48,8 @@ public:
 
     void Stop();
 
+    bool Sync(int64_t tolerance_us, double transfer_bandwidth_gbps = 0);
+
     bool GrabNext( unsigned char* image, bool wait = true );
 
     bool GrabNewest( unsigned char* image, bool wait = true );
@@ -56,12 +57,16 @@ public:
     std::vector<VideoInterface*>& InputStreams();
 
 protected:
+    int64_t GetEndOfCaptureTime(size_t src_index);
+
+    std::vector<std::unique_ptr<VideoInterface>> storage;
     std::vector<VideoInterface*> src;
     std::vector<StreamInfo> streams;
     size_t size_bytes;
+
+    int64_t sync_tolerance_us;
+    int64_t transfer_bandwidth_bytes_per_us;
 };
 
 
 }
-
-#endif // PANGOLIN_VIDEO_JOIN_H

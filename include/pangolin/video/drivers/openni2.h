@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PANGOLIN_OPENNI2_H
-#define PANGOLIN_OPENNI2_H
+#pragma once
 
 #include <pangolin/pangolin.h>
 
@@ -41,21 +40,21 @@ namespace pangolin
 const int MAX_OPENNI2_STREAMS = 2 * ONI_MAX_SENSORS;
 
 //! Interface to video capture sources
-struct OpenNiVideo2 : public VideoInterface, public VideoPropertiesInterface, public VideoPlaybackInterface
+struct OpenNi2Video : public VideoInterface, public VideoPropertiesInterface, public VideoPlaybackInterface
 {
 public:
 
     // Open all RGB and Depth streams from all devices
-    OpenNiVideo2(ImageDim dim=ImageDim(640,480), int fps=30);
+    OpenNi2Video(ImageDim dim=ImageDim(640,480), ImageRoi roi=ImageRoi(0,0,0,0), int fps=30);
 
     // Open streams specified
-    OpenNiVideo2(std::vector<OpenNiStreamMode>& stream_modes);
+    OpenNi2Video(std::vector<OpenNiStreamMode>& stream_modes);
 
     // Open openni file
-    OpenNiVideo2(const std::string& filename);
+    OpenNi2Video(const std::string& filename);
 
     // Open openni file with certain params
-    OpenNiVideo2(const std::string& filename, std::vector<OpenNiStreamMode>& stream_modes);
+    OpenNi2Video(const std::string& filename, std::vector<OpenNiStreamMode>& stream_modes);
     
     void UpdateProperties();
 
@@ -65,11 +64,12 @@ public:
     void SetDepthCloseRange(bool enable);
     void SetDepthHoleFilter(bool enable);
     void SetDepthColorSyncEnabled(bool enable);
+    void SetFastCrop(bool enable);
     void SetRegisterDepthToImage(bool enable);
     void SetPlaybackSpeed(float speed);
     void SetPlaybackRepeat(bool enabled);
 
-    ~OpenNiVideo2();
+    ~OpenNi2Video();
 
     //! Implement VideoInput::Start()
     void Start();
@@ -118,8 +118,8 @@ protected:
     void PrintOpenNI2Modes(openni::SensorType sensorType);
     openni::VideoMode FindOpenNI2Mode(openni::Device &device, openni::SensorType sensorType, int width, int height, int fps, openni::PixelFormat fmt );
 
-    int numDevices;
-    int numStreams;
+    size_t numDevices;
+    size_t numStreams;
 
     openni::Device devices[ONI_MAX_SENSORS];
     OpenNiStreamMode sensor_type[ONI_MAX_SENSORS];
@@ -146,5 +146,3 @@ protected:
 };
 
 }
-
-#endif // PANGOLIN_OPENNI2_H

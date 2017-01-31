@@ -34,6 +34,64 @@
 namespace pangolin
 {
 
+std::string ImageFileType2Name(ImageFileType t)
+{
+    switch(t)
+    {
+    case ImageFileTypePpm:
+	return "ImageFileTypePpm";
+    case ImageFileTypeTga:
+	return "ImageFileTypeTga";
+    case ImageFileTypePng:
+	return "ImageFileTypePng";
+    case ImageFileTypeJpg:
+	return "ImageFileTypeJpg";
+    case ImageFileTypeTiff:
+	return "ImageFileTypeTiff";
+    case ImageFileTypeGif:
+	return "ImageFileTypeGif";
+    case ImageFileTypeExr:
+	return "ImageFileTypeExr";
+    case ImageFileTypePango:
+	return "ImageFileTypePango";
+    case ImageFileTypePvn:
+	return "ImageFileTypePvn";
+    case ImageFileTypeUnknown:
+    default:
+	return "ImageFileTypeUnknown";
+    }
+}
+
+ImageFileType Name2ImageFileType(const std::string& name)
+{
+    if (name.substr(0, 13) != "ImageFileType")
+	return ImageFileTypeUnknown;
+
+    auto ext = name.substr(13);
+
+    if ("Ppm" == ext)
+	return ImageFileTypePpm;
+    else if ("Tga" == ext)
+	return ImageFileTypeTga;
+    else if ("Png" == ext)
+    	return ImageFileTypePng;
+    else if ("Jpg" == ext)
+    	return ImageFileTypeJpg;
+    else if ("Tiff" == ext)
+    	return ImageFileTypeTiff;
+    else if ("Gif" == ext)
+    	return ImageFileTypeGif;
+    else if ("Exr" == ext)
+    	return ImageFileTypeExr;
+    else if ("Pango" == ext)
+    	return ImageFileTypePango;
+    else if ("Pvn" == ext)
+	return ImageFileTypePvn;
+
+    return ImageFileTypeUnknown;
+}
+
+
 std::string FileLowercaseExtention(const std::string& filename)
 {
     size_t pos = filename.find_last_of('.');
@@ -110,15 +168,16 @@ ImageFileType FileTypeExtension(const std::string& ext)
 ImageFileType FileType(const std::string& filename)
 {
     // Check magic number of file...
-    FILE *fp = fopen(filename.c_str(), "rb");
-    if(fp) {
+    std::ifstream f(filename.c_str(), std::ios::binary );
+    if(f.is_open()) {
         const size_t magic_bytes = 8;
         unsigned char magic[magic_bytes];
-        size_t num_read = fread( (void *)magic, 1, magic_bytes, fp);
-        ImageFileType magic_type = FileTypeMagic(magic, num_read);
-        fclose(fp);
-        if(magic_type != ImageFileTypeUnknown) {
-            return magic_type;
+        f.read((char*)magic, magic_bytes);
+        if(f.good()) {
+            ImageFileType magic_type = FileTypeMagic(magic, magic_bytes);
+            if(magic_type != ImageFileTypeUnknown) {
+                return magic_type;
+            }
         }
     }
 

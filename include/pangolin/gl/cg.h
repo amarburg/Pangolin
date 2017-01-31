@@ -25,8 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PANGOLIN_CG_H
-#define PANGOLIN_CG_H
+#pragma once
 
 #include <sstream>
 #include <algorithm>
@@ -55,6 +54,8 @@ class CgProgram
 public:
     void SetUniform(const std::string& name, GlTexture& tex);
     void SetUniform(const std::string& name, float f);
+    void SetUniform(const std::string& name, float v0, float v1);
+    void SetUniform(const std::string& name, float v0, float v1, float v2, float v3);
     
 #ifdef HAVE_TOON
     void SetUniform(const std::string& name, const TooN::Vector<2>& v );
@@ -228,6 +229,20 @@ void CgProgram::SetUniform(const std::string& name, GlTexture& tex)
     cgUpdateProgramParameters(mProg);
 }
 
+void CgProgram::SetUniform(const std::string& name, float v0, float v1, float v2, float v3)
+{
+    CGparameter p = cgGetNamedParameter( mProg, name.c_str());
+    cgGLSetParameter4f(p, v0,v1,v2,v3);
+    cgUpdateProgramParameters(mProg);
+}
+
+void CgProgram::SetUniform(const std::string& name, float v0, float v1)
+{
+    CGparameter p = cgGetNamedParameter( mProg, name.c_str());
+    cgGLSetParameter2f(p, v0,v1);
+    cgUpdateProgramParameters(mProg);
+}
+
 #ifdef HAVE_TOON
 void CgProgram::SetUniform(const std::string& name, const TooN::Vector<2>& v )
 {
@@ -266,5 +281,3 @@ void CgProgram::UpdateParams()
 
 
 }
-
-#endif // PANGOLIN_CG_H

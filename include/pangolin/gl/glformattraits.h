@@ -25,8 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PANGOLIN_GLFORMATTRAITS_H
-#define PANGOLIN_GLFORMATTRAITS_H
+#pragma once
 
 #include <pangolin/gl/glplatform.h>
 
@@ -53,12 +52,20 @@ struct GlFormatTraits<float>
     static const GLenum gltype = GL_FLOAT;
 };
 
+template<>
+struct GlFormatTraits<double>
+{
+    static const GLint glinternalformat = GL_LUMINANCE32F_ARB;
+    static const GLenum glformat = GL_LUMINANCE;
+    static const GLenum gltype = GL_DOUBLE;
+};
+
 //////////////////////////////////////////////////////////////////
 
 template<>
 struct GlFormatTraits<unsigned char>
 {
-    static const GLint glinternalformat = GL_LUMINANCE;
+    static const GLint glinternalformat = GL_LUMINANCE32F_ARB;
     static const GLenum glformat = GL_LUMINANCE;
     static const GLenum gltype = GL_UNSIGNED_BYTE;
 };
@@ -68,11 +75,25 @@ struct GlFormatTraits<unsigned char>
 template<>
 struct GlFormatTraits<unsigned short>
 {
-    static const GLint glinternalformat = GL_LUMINANCE;
+    static const GLint glinternalformat = GL_LUMINANCE32F_ARB;
     static const GLenum glformat = GL_LUMINANCE;
     static const GLenum gltype = GL_UNSIGNED_SHORT;
 };
 
-}
+template<>
+struct GlFormatTraits<unsigned int>
+{
+    static const GLint glinternalformat = GL_LUMINANCE32F_ARB;
+    static const GLenum glformat = GL_LUMINANCE;
+    static const GLenum gltype = GL_UNSIGNED_INT;
+};
 
-#endif // PANGOLIN_GLFORMATTRAITS_H
+template<>
+struct GlFormatTraits<int>
+{
+    static const GLint glinternalformat = GL_LUMINANCE32F_ARB;
+    static const GLenum glformat = GL_LUMINANCE;
+    static const GLenum gltype = GL_INT;
+};
+
+}

@@ -25,8 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PANGOLIN_GLPLATFORM_H
-#define PANGOLIN_GLPLATFORM_H
+#pragma once
 
 //////////////////////////////////////////////////////////
 // Attempt to portably include Necessary OpenGL headers
@@ -36,7 +35,9 @@
 
 #ifdef _WIN_
     // Define maths quantities when using <cmath> to match posix systems
-    #define _USE_MATH_DEFINES
+    #ifndef _USE_MATH_DEFINES
+    #  define _USE_MATH_DEFINES
+    #endif
 
     // Don't define min / max macros in windows.h or other unnecessary macros
     #define NOMINMAX
@@ -47,6 +48,7 @@
     #undef LoadImage
     #undef near
     #undef far
+    #undef ERROR
 #endif
 
 #ifdef HAVE_GLEW
@@ -77,5 +79,3 @@
 #endif // HAVE_GLES
 
 #include <pangolin/gl/glpangoglu.h>
-
-#endif // PANGOLIN_GLPLATFORM_H

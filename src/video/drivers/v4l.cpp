@@ -27,6 +27,8 @@
  */
 
 #include <pangolin/video/drivers/v4l.h>
+#include <pangolin/factory/factory_registry.h>
+#include <pangolin/video/iostream_operators.h>
 
 #include <iostream>
 #include <stdio.h>
@@ -103,7 +105,7 @@ size_t V4lVideo::SizeBytes() const
     return image_size;
 }
 
-bool V4lVideo::GrabNext( unsigned char* image, bool wait )
+bool V4lVideo::GrabNext( unsigned char* image, bool /*wait*/ )
 {
     for (;;) {
         fd_set fds;
@@ -246,82 +248,86 @@ int V4lVideo::ReadFrame(unsigned char* image)
 
 void V4lVideo::Stop()
 {
-    enum v4l2_buf_type type;
-    
-    switch (io) {
-    case IO_METHOD_READ:
-        /* Nothing to do. */
-        break;
-        
-    case IO_METHOD_MMAP:
-    case IO_METHOD_USERPTR:
-        type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        
-        if (-1 == xioctl (fd, VIDIOC_STREAMOFF, &type))
-            throw VideoException("VIDIOC_STREAMOFF", strerror(errno));
-        
-        break;
+    if(running) {
+        enum v4l2_buf_type type;
+
+        switch (io) {
+        case IO_METHOD_READ:
+            /* Nothing to do. */
+            break;
+
+        case IO_METHOD_MMAP:
+        case IO_METHOD_USERPTR:
+            type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
+            if (-1 == xioctl (fd, VIDIOC_STREAMOFF, &type))
+                throw VideoException("VIDIOC_STREAMOFF", strerror(errno));
+
+            break;
+        }
+
+        running = false;
     }
-    
-    running = false;
 }
 
 void V4lVideo::Start()
 {
-    unsigned int i;
-    enum v4l2_buf_type type;
-    
-    switch (io) {
-    case IO_METHOD_READ:
-        /* Nothing to do. */
-        break;
-        
-    case IO_METHOD_MMAP:
-        for (i = 0; i < n_buffers; ++i) {
-            struct v4l2_buffer buf;
-            
-            CLEAR (buf);
-            
-            buf.type        = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-            buf.memory      = V4L2_MEMORY_MMAP;
-            buf.index       = i;
-            
-            if (-1 == xioctl (fd, VIDIOC_QBUF, &buf))
-                throw VideoException("VIDIOC_QBUF", strerror(errno));
+    if(!running) {
+        unsigned int i;
+        enum v4l2_buf_type type;
+
+        switch (io) {
+        case IO_METHOD_READ:
+            /* Nothing to do. */
+            break;
+
+        case IO_METHOD_MMAP:
+            for (i = 0; i < n_buffers; ++i) {
+                struct v4l2_buffer buf;
+
+                CLEAR (buf);
+
+                buf.type        = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+                buf.memory      = V4L2_MEMORY_MMAP;
+                buf.index       = i;
+
+                if (-1 == xioctl (fd, VIDIOC_QBUF, &buf))
+                    throw VideoException("VIDIOC_QBUF", strerror(errno));
+            }
+
+            type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
+            if (-1 == xioctl (fd, VIDIOC_STREAMON, &type))
+                throw VideoException("VIDIOC_STREAMON", strerror(errno));
+
+            break;
+
+        case IO_METHOD_USERPTR:
+            for (i = 0; i < n_buffers; ++i) {
+                struct v4l2_buffer buf;
+
+                CLEAR (buf);
+
+                buf.type        = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+                buf.memory      = V4L2_MEMORY_USERPTR;
+                buf.index       = i;
+                buf.m.userptr   = (unsigned long) buffers[i].start;
+                buf.length      = buffers[i].length;
+
+                if (-1 == xioctl (fd, VIDIOC_QBUF, &buf))
+                    throw VideoException("VIDIOC_QBUF", strerror(errno));
+            }
+
+            type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
+            if (-1 == xioctl (fd, VIDIOC_STREAMON, &type))
+                throw VideoException ("VIDIOC_STREAMON", strerror(errno));
+
+            break;
         }
-        
-        type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        
-        if (-1 == xioctl (fd, VIDIOC_STREAMON, &type))
-            throw VideoException("VIDIOC_STREAMON", strerror(errno));
-        
-        break;
-        
-    case IO_METHOD_USERPTR:
-        for (i = 0; i < n_buffers; ++i) {
-            struct v4l2_buffer buf;
-            
-            CLEAR (buf);
-            
-            buf.type        = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-            buf.memory      = V4L2_MEMORY_USERPTR;
-            buf.index       = i;
-            buf.m.userptr   = (unsigned long) buffers[i].start;
-            buf.length      = buffers[i].length;
-            
-            if (-1 == xioctl (fd, VIDIOC_QBUF, &buf))
-                throw VideoException("VIDIOC_QBUF", strerror(errno));
-        }
-        
-        type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        
-        if (-1 == xioctl (fd, VIDIOC_STREAMON, &type))
-            throw VideoException ("VIDIOC_STREAMON", strerror(errno));
-        
-        break;
+
+        running = true;
     }
-    
-    running = true;
 }
 
 void V4lVideo::uninit_device()
@@ -364,7 +370,7 @@ void V4lVideo::init_read(unsigned int buffer_size)
     }
 }
 
-void V4lVideo::init_mmap(const char* dev_name)
+void V4lVideo::init_mmap(const char* /*dev_name*/)
 {
     struct v4l2_requestbuffers req;
     
@@ -417,7 +423,7 @@ void V4lVideo::init_mmap(const char* dev_name)
     }
 }
 
-void V4lVideo::init_userp(const char* dev_name, unsigned int buffer_size)
+void V4lVideo::init_userp(const char* /*dev_name*/, unsigned int buffer_size)
 {
     struct v4l2_requestbuffers req;
     unsigned int page_size;
@@ -587,15 +593,30 @@ void V4lVideo::init_device(const char* dev_name, unsigned iwidth, unsigned iheig
         spix="GRAY8";
     }else if(fmt.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
         spix="YUYV422";
+    }else if(fmt.fmt.pix.pixelformat == V4L2_PIX_FMT_Y16) {
+        spix="GRAY16LE";
     }else{
         // TODO: Add method to translate from V4L to FFMPEG type.
         std::cerr << "V4L Format " << V4lToString(fmt.fmt.pix.pixelformat)
                   << " not recognised. Defaulting to '" << spix << std::endl;
     }
 
-    const VideoPixelFormat pfmt = VideoFormatFromString(spix);
+    const PixelFormat pfmt = PixelFormatFromString(spix);
     const StreamInfo stream_info(pfmt, width, height, (width*pfmt.bpp)/8, 0);
+
     streams.push_back(stream_info);
+}
+
+void V4lVideo::SetExposureUs(int exposure_us)
+{
+    struct v4l2_control control;
+    control.id = V4L2_CID_EXPOSURE_ABSOLUTE;
+    // v4l specifies exposure in 100us units
+    control.value = exposure_us / 100;
+
+    if (-1 == xioctl (fd, VIDIOC_S_CTRL, &control))
+        pango_print_warn("V4lVideo::SetExposureUs() ioctl error: %d\n", errno);
+
 }
 
 void V4lVideo::close_device()
@@ -640,6 +661,37 @@ int V4lVideo::IoCtrl(uint8_t unit, uint8_t ctrl, unsigned char* data, int len, U
         return ret;
     }
     return 0;
+}
+
+PANGOLIN_REGISTER_FACTORY(V4lVideo)
+{
+    struct V4lVideoFactory : public FactoryInterface<VideoInterface> {
+        std::unique_ptr<VideoInterface> Open(const Uri& uri) override {
+            const std::string smethod = uri.Get<std::string>("method","mmap");
+            const ImageDim desired_dim = uri.Get<ImageDim>("size", ImageDim(0,0));
+            const int exposure_us = uri.Get<int>("ExposureTime", 10000);
+
+            io_method method = IO_METHOD_MMAP;
+
+            if(smethod == "read" ) {
+                method = IO_METHOD_READ;
+            }else if(smethod == "mmap" ) {
+                method = IO_METHOD_MMAP;
+            }else if(smethod == "userptr" ) {
+                method = IO_METHOD_USERPTR;
+            }
+
+            V4lVideo* video_raw = new V4lVideo(uri.url.c_str(), method, desired_dim.x, desired_dim.y );
+            if(video_raw) {
+                static_cast<V4lVideo*>(video_raw)->SetExposureUs(exposure_us);
+            }
+            return std::unique_ptr<VideoInterface>(video_raw);
+        }
+    };
+
+    auto factory = std::make_shared<V4lVideoFactory>();
+    FactoryRegistry<VideoInterface>::I().RegisterFactory(factory, 10, "v4l");
+    FactoryRegistry<VideoInterface>::I().RegisterFactory(factory, 10, "uvc");
 }
 
 }

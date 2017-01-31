@@ -25,8 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PANGOLIN_GLCHAR_H
-#define PANGOLIN_GLCHAR_H
+#pragma once
 
 #include <pangolin/gl/glplatform.h>
 #include <map>
@@ -39,9 +38,9 @@ struct PANGOLIN_EXPORT XYUV
     XYUV(GLfloat x, GLfloat y, GLfloat tu, GLfloat tv)
         : x(x), y(y), tu(tu), tv(tv) {}
 
-    XYUV operator+(int dx) const {
+    XYUV operator+(float dx) const {
         return XYUV(x+dx,y,tu,tv);
-    }    
+    }
     
     GLfloat x, y, tu, tv;
 };
@@ -77,5 +76,3 @@ protected:
 };
 
 }
-
-#endif // PANGOLIN_GLCHAR_H

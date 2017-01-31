@@ -26,6 +26,8 @@
  */
 
 #include <pangolin/video/drivers/depthsense.h>
+#include <pangolin/factory/factory_registry.h>
+#include <pangolin/video/iostream_operators.h>
 #include <iomanip>
 
 namespace pangolin
@@ -97,7 +99,7 @@ void DepthSenseContext::StartNodes()
 {
     if(!is_running) {
         // Launch EventLoop thread
-        event_thread = boostd::thread(&DepthSenseContext::EventLoop, this );
+        event_thread = std::thread(&DepthSenseContext::EventLoop, this );
     }
 }
 
@@ -379,7 +381,7 @@ void DepthSenseVideo::ConfigureDepthNode(const SensorConfig& sensorConfig, const
     const int w = sensorConfig.dim.x;
     const int h = sensorConfig.dim.y;
 
-    const VideoPixelFormat pfmt = VideoFormatFromString("GRAY16LE");
+    const PixelFormat pfmt = PixelFormatFromString("GRAY16LE");
 
     const StreamInfo stream_info(pfmt, w, h, (w*pfmt.bpp) / 8, (unsigned char*)0);
     streams.push_back(stream_info);
@@ -415,7 +417,7 @@ void DepthSenseVideo::ConfigureColorNode(const SensorConfig& sensorConfig, const
     const int w = sensorConfig.dim.x;
     const int h = sensorConfig.dim.y;
 
-    const VideoPixelFormat pfmt = VideoFormatFromString("BGR24");
+    const PixelFormat pfmt = PixelFormatFromString("BGR24");
 
     const StreamInfo stream_info(pfmt, w, h, (w*pfmt.bpp) / 8, (unsigned char*)0 + size_bytes);
     streams.push_back(stream_info);
@@ -428,7 +430,7 @@ void DepthSenseVideo::ConfigureColorNode(const SensorConfig& sensorConfig, const
 void DepthSenseVideo::onNewColorSample(DepthSense::ColorNode node, DepthSense::ColorNode::NewSampleReceivedData data)
 {
     {
-        boostd::unique_lock<boostd::mutex> lock(update_mutex);
+        std::unique_lock<std::mutex> lock(update_mutex);
 
         // Wait for fill request
         while (!fill_image) {
@@ -488,7 +490,7 @@ void DepthSenseVideo::onNewColorSample(DepthSense::ColorNode node, DepthSense::C
 void DepthSenseVideo::onNewDepthSample(DepthSense::DepthNode node, DepthSense::DepthNode::NewSampleReceivedData data)
 {
     {
-        boostd::unique_lock<boostd::mutex> lock(update_mutex);
+        std::unique_lock<std::mutex> lock(update_mutex);
 
         // Wait for fill request
         while(!fill_image) {
@@ -567,7 +569,7 @@ const std::vector<StreamInfo>& DepthSenseVideo::Streams() const
     return streams;
 }
 
-bool DepthSenseVideo::GrabNext( unsigned char* image, bool wait )
+bool DepthSenseVideo::GrabNext( unsigned char* image, bool /*wait*/ )
 {
     if(fill_image) {
         throw std::runtime_error("GrabNext Cannot be called concurrently");
@@ -581,7 +583,7 @@ bool DepthSenseVideo::GrabNext( unsigned char* image, bool wait )
 
     // Wait until it has been filled successfully. 
     {
-        boostd::unique_lock<boostd::mutex> lock(update_mutex);
+        std::unique_lock<std::mutex> lock(update_mutex);
         while ((enableDepth && !gotDepth) || (enableColor && !gotColor))
         {
             cond_image_filled.wait(lock);
@@ -611,6 +613,44 @@ bool DepthSenseVideo::GrabNewest( unsigned char* image, bool wait )
 double DepthSenseVideo::GetDeltaTime() const
 {
     return depthTs - colorTs;
+}
+
+DepthSenseSensorType depthsense_sensor(const std::string& str)
+{
+    if (!str.compare("rgb")) {
+        return DepthSenseRgb;
+    }
+    else if (!str.compare("depth")) {
+        return DepthSenseDepth;
+    }
+    else if (str.empty()) {
+        return DepthSenseUnassigned;
+    }
+    else{
+        throw pangolin::VideoException("Unknown DepthSense sensor", str);
+    }
+}
+
+PANGOLIN_REGISTER_FACTORY(DepthSenseVideo)
+{
+    struct DepthSenseVideoFactory : public FactoryInterface<VideoInterface> {
+        std::unique_ptr<VideoInterface> Open(const Uri& uri) override {
+            DepthSenseSensorType img1 = depthsense_sensor(uri.Get<std::string>("img1", "depth"));
+            DepthSenseSensorType img2 = depthsense_sensor(uri.Get<std::string>("img2", ""));
+
+            const ImageDim dim1 = uri.Get<ImageDim>("size1", img1 == DepthSenseDepth ? ImageDim(320, 240) : ImageDim(640, 480) );
+            const ImageDim dim2 = uri.Get<ImageDim>("size2", img2 == DepthSenseDepth ? ImageDim(320, 240) : ImageDim(640, 480) );
+
+            const unsigned int fps1 = uri.Get<unsigned int>("fps1", 30);
+            const unsigned int fps2 = uri.Get<unsigned int>("fps2", 30);
+
+            return std::unique_ptr<VideoInterface>(
+                DepthSenseContext::I().GetDepthSenseVideo(0, img1, img2, dim1, dim2, fps1, fps2, uri)
+            );
+        }
+    };
+
+    FactoryRegistry<VideoInterface>::I().RegisterFactory(std::make_shared<DepthSenseVideoFactory>(), 10, "depthsense");
 }
 
 }

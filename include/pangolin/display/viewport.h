@@ -25,8 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PANGOLIN_VIEWPORT_H
-#define PANGOLIN_VIEWPORT_H
+#pragma once
 
 #include <pangolin/gl/glinclude.h>
 
@@ -36,7 +35,7 @@ namespace pangolin
 /// Encapsulates OpenGl Viewport.
 struct PANGOLIN_EXPORT Viewport
 {
-    Viewport() {}
+    Viewport() : l(0),b(0),w(0),h(0) {}
     Viewport(GLint l,GLint b,GLint w,GLint h) : l(l),b(b),w(w),h(h) {}
     
     void Activate() const;
@@ -61,5 +60,3 @@ struct PANGOLIN_EXPORT Viewport
 };
 
 }
-
-#endif // PANGOLIN_VIEWPORT_H

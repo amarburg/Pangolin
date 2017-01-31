@@ -25,41 +25,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PANGOLIN_IMAGE_IO_H
-#define PANGOLIN_IMAGE_IO_H
+#pragma once
 
-#include <pangolin/image/image.h>
-#include <pangolin/image/image_common.h>
+#include <pangolin/image/typed_image.h>
 #include <pangolin/utils/file_extension.h>
 
 namespace pangolin {
-
-struct TypedImage : public Image<unsigned char>
-{
-    inline TypedImage()
-        : Image<unsigned char>()
-    {
-    }
-    
-    inline TypedImage(size_t w, size_t h, size_t pitch, unsigned char* ptr, const VideoPixelFormat& fmt)
-        : Image<unsigned char>(w,h,pitch,ptr), fmt(fmt)
-    {
-    }    
-    
-    inline void Alloc(size_t w, size_t h, const VideoPixelFormat& fmt)
-    {
-        this->fmt = fmt;
-        Image<unsigned char>::Alloc(w, h, w*fmt.bpp / 8);
-    }
-    
-    inline void Alloc(size_t w, size_t h, const VideoPixelFormat& fmt, size_t pitch)
-    {
-        this->fmt = fmt;
-        Image<unsigned char>::Alloc(w, h, pitch);
-    }
-    
-    VideoPixelFormat fmt;
-};
 
 PANGOLIN_EXPORT
 TypedImage LoadImage(const std::string& filename, ImageFileType file_type);
@@ -68,14 +39,12 @@ PANGOLIN_EXPORT
 TypedImage LoadImage(const std::string& filename);
 
 PANGOLIN_EXPORT
-void SaveImage(const Image<unsigned char>& image, const pangolin::VideoPixelFormat& fmt, const std::string& filename, bool top_line_first = true);
+TypedImage LoadImage(const std::string& filename, const PixelFormat& raw_fmt, size_t raw_width, size_t raw_height, size_t raw_pitch);
+
+PANGOLIN_EXPORT
+void SaveImage(const Image<unsigned char>& image, const pangolin::PixelFormat& fmt, const std::string& filename, bool top_line_first = true);
 
 PANGOLIN_EXPORT
 void SaveImage(const TypedImage& image, const std::string& filename, bool top_line_first = true);
 
-PANGOLIN_EXPORT
-void FreeImage(TypedImage& img);
-
 }
-
-#endif // PANGOLIN_IMAGE_IO_H

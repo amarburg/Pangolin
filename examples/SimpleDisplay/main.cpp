@@ -32,7 +32,7 @@ void SampleMethod()
 }
 
 
-int main( int argc, char* argv[] )
+int main(/*int argc, char* argv[]*/)
 {  
   // Load configuration data
   pangolin::ParseVarsFile("app.cfg");
@@ -70,18 +70,15 @@ int main( int argc, char* argv[] )
   pangolin::Var<double> a_double_log("ui.Log_scale var",3,1,1E4, true);
   pangolin::Var<bool> a_checkbox("ui.A_Checkbox",false,true);
   pangolin::Var<int> an_int_no_input("ui.An_Int_No_Input",2);
-  pangolin::Var<CustomType> any_type("ui.Some_Type", CustomType(0,1.2,"Hello") );
+  pangolin::Var<CustomType> any_type("ui.Some_Type", CustomType(0,1.2f,"Hello") );
 
   pangolin::Var<bool> save_window("ui.Save_Window",false,false);
   pangolin::Var<bool> save_cube("ui.Save_Cube",false,false);
 
   pangolin::Var<bool> record_cube("ui.Record_Cube",false,false);
 
-#ifdef CPP11_NO_BOOST
-  // boost::function / std::function objects can be used for Var's too.
-  // In C++11, these work great with closures.
+  // std::function objects can be used for Var's too. These work great with C++11 closures.
   pangolin::Var<std::function<void(void)> > reset("ui.Reset", SampleMethod);
-#endif
 
   // Demonstration of how we can register a keyboard hook to alter a Var
   pangolin::RegisterKeyPressCallback(pangolin::PANGO_CTRL + 'b', pangolin::SetVarFunctor<double>("ui.A Double", 3.5));
@@ -101,10 +98,10 @@ int main( int argc, char* argv[] )
     // Overloading of Var<T> operators allows us to treat them like
     // their wrapped types, eg:
     if( a_checkbox )
-      an_int = a_double;
+      an_int = (int)a_double;
 
     if( !any_type->z.compare("robot"))
-        any_type = CustomType(1,2.3,"Boogie");
+        any_type = CustomType(1,2.3f,"Boogie");
 
     an_int_no_input = an_int;
 

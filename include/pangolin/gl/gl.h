@@ -25,8 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PANGOLIN_GL_H
-#define PANGOLIN_GL_H
+#pragma once
 
 #include <pangolin/gl/glinclude.h>
 #include <pangolin/display/viewport.h>
@@ -37,7 +36,7 @@
 #endif
 
 #ifdef USE_EIGEN
-#include <Eigen/Eigen>
+#include <Eigen/Core>
 #endif
 
 #include <math.h>
@@ -55,16 +54,15 @@ class PANGOLIN_EXPORT GlTexture
 {
 public:
     //! internal_format normally one of GL_RGBA8, GL_LUMINANCE8, GL_INTENSITY16
-    GlTexture(GLint width, GLint height, GLint internal_format = GL_RGBA, bool sampling_linear = true, int border = 0, GLenum glformat = GL_RGBA, GLenum gltype = GL_UNSIGNED_BYTE, GLvoid* data = NULL  );
+    GlTexture(GLint width, GLint height, GLint internal_format = GL_RGBA8, bool sampling_linear = true, int border = 0, GLenum glformat = GL_RGBA, GLenum gltype = GL_UNSIGNED_BYTE, GLvoid* data = NULL  );
     
-#ifdef CALLEE_HAS_RVALREF
-    //! Move Constructor
+    //! Move Constructor / asignment
     GlTexture(GlTexture&& tex);
-#endif
+    void operator=(GlTexture&& tex);
     
     //! Default constructor represents 'no texture'
     GlTexture();
-    ~GlTexture();
+    virtual ~GlTexture();
 
     bool IsValid() const;
 
@@ -72,7 +70,7 @@ public:
     void Delete();
     
     //! Reinitialise teture width / height / format
-    void Reinitialise(GLint width, GLint height, GLint internal_format = GL_RGBA, bool sampling_linear = true, int border = 0, GLenum glformat = GL_RGBA, GLenum gltype = GL_UNSIGNED_BYTE, GLvoid* data = NULL );
+    virtual void Reinitialise(GLsizei width, GLsizei height, GLint internal_format = GL_RGBA8, bool sampling_linear = true, int border = 0, GLenum glformat = GL_RGBA, GLenum gltype = GL_UNSIGNED_BYTE, GLvoid* data = NULL );
     
     void Bind() const;
     void Unbind() const;
@@ -83,10 +81,9 @@ public:
     
     //! Upload data to texture, overwriting a sub-region of it.
     //! data ptr contains packed data_w x data_h of pixel data.
-    void Upload(
-        const void* data,
-        unsigned int tex_x_offset, unsigned int tex_y_offset,
-        unsigned int data_w, unsigned int data_h,
+    void Upload(const void* data,
+        GLsizei tex_x_offset, GLsizei tex_y_offset,
+        GLsizei data_w, GLsizei data_h,
         GLenum data_format, GLenum data_type
     );
 
@@ -95,6 +92,8 @@ public:
     void LoadFromFile(const std::string& filename, bool sampling_linear = true);
 
     void Download(void* image, GLenum data_layout = GL_LUMINANCE, GLenum data_type = GL_FLOAT) const;
+
+    void Download(TypedImage& image) const;
 
     void Save(const std::string& filename, bool top_line_first = true);
 
@@ -124,10 +123,8 @@ struct PANGOLIN_EXPORT GlRenderBuffer
 
     void Reinitialise(GLint width, GLint height, GLint internal_format = GL_DEPTH_COMPONENT24);
 
-#ifdef CALLEE_HAS_RVALREF
     //! Move Constructor
     GlRenderBuffer(GlRenderBuffer&& tex);
-#endif
 
     ~GlRenderBuffer();
     
@@ -150,6 +147,8 @@ struct PANGOLIN_EXPORT GlFramebuffer
     
     void Bind() const;
     void Unbind() const;
+
+    void Reinitialise();
     
     // Attach Colour texture to frame buffer
     // Return attachment texture is bound to (e.g. GL_COLOR_ATTACHMENT0_EXT)
@@ -178,14 +177,15 @@ struct PANGOLIN_EXPORT GlBuffer
     GlBuffer();
     GlBuffer(GlBufferType buffer_type, GLuint num_elements, GLenum datatype, GLuint count_per_element, GLenum gluse = GL_DYNAMIC_DRAW );
     
-#ifdef CALLEE_HAS_RVALREF
-    //! Move Constructor
+    //! Move Constructor / Assignment
     GlBuffer(GlBuffer&& tex);
-#endif  
+    void operator=(GlBuffer&& tex);
     
     ~GlBuffer();
 
     bool IsValid() const;
+
+    size_t SizeBytes() const;
     
     void Reinitialise(GlBufferType buffer_type, GLuint num_elements, GLenum datatype, GLuint count_per_element, GLenum gluse );
     void Resize(GLuint num_elements);
@@ -193,6 +193,7 @@ struct PANGOLIN_EXPORT GlBuffer
     void Bind() const;
     void Unbind() const;
     void Upload(const GLvoid* data, GLsizeiptr size_bytes, GLintptr offset = 0);
+    void Download(GLvoid* ptr, GLsizeiptr size_bytes, GLintptr offset = 0) const;
     
     GLuint bo;
     GlBufferType buffer_type;
@@ -233,11 +234,11 @@ protected:
     size_t  m_num_verts;    
 };
 
+size_t GlFormatChannels(GLenum data_layout);
+
 size_t GlDataTypeBytes(GLenum type);
 
 }
 
 // Include implementation
 #include <pangolin/gl/gl.hpp>
-
-#endif // PANGOLIN_GL_H

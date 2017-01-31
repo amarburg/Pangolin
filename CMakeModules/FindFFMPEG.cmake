@@ -55,10 +55,12 @@ IF(AVCODEC_INCLUDE_DIR AND AVFORMAT_INCLUDE_DIR AND AVUTIL_INCLUDE_DIR AND SWSCA
 
    include(CheckCXXSourceCompiles)
 
+   SET(CMAKE_REQUIRED_INCLUDES ${FFMPEG_INCLUDE_DIRS})
+
    CHECK_CXX_SOURCE_COMPILES(
      "#include \"${AVCODEC_INCLUDE_DIR}/libavformat/avformat.h\"
       int main() {
-        &AVFormatContext::max_analyze_duration2;
+        sizeof(AVFormatContext::max_analyze_duration2);
       }" HAVE_FFMPEG_MAX_ANALYZE_DURATION2
    )
    CHECK_CXX_SOURCE_COMPILES(
@@ -66,6 +68,12 @@ IF(AVCODEC_INCLUDE_DIR AND AVFORMAT_INCLUDE_DIR AND AVUTIL_INCLUDE_DIR AND SWSCA
       int main() {
         &avformat_alloc_output_context2;
       }" HAVE_FFMPEG_AVFORMAT_ALLOC_OUTPUT_CONTEXT2
+   )
+   CHECK_CXX_SOURCE_COMPILES(
+     "#include \"${AVCODEC_INCLUDE_DIR}/libavutil/pixdesc.h\"
+      int main() {
+        AVPixelFormat test = AV_PIX_FMT_GRAY8;
+      }" HAVE_FFMPEG_AVPIXELFORMAT
    )
 ENDIF()
 

@@ -13,6 +13,7 @@ find_path(
         "${CMAKE_SOURCE_DIR}/../TeliCamSDK/TeliCamApi/Include"
         /usr/include
         /user/include
+	/opt/TeliCamSDK/include
     PATH_SUFFIXES TeliCam
 )
 
@@ -24,23 +25,25 @@ endif()
 
 find_library(
     TeliCamApi_LIBRARY
-    NAMES TeliCamApi TeliCamApi64
+    NAMES TeliCamApi TeliCamApi64 TeliCamApi_64
     PATHS
         "${PROGRAM_FILES}/Toshiba Teli/TeliCamSDK/TeliCamApi/lib"
         "${CMAKE_SOURCE_DIR}/../TeliCamSDK/TeliCamApi/lib"
         /usr/lib
         /user/lib
+	/opt/TeliCamSDK/lib
     PATH_SUFFIXES ${TELI_PATH_SUFFIXES}
 )
 
 find_library(
     TeliCamUtl_LIBRARY
-    NAMES TeliCamUtl TeliCamUtl64
+    NAMES TeliCamUtl TeliCamUtl64 TeliCamUtl_64
     PATHS
         "${PROGRAM_FILES}/Toshiba Teli/TeliCamSDK/TeliCamApi/lib"
         "${CMAKE_SOURCE_DIR}/../TeliCamSDK/TeliCamApi/lib"
         /usr/lib
         /user/lib
+	/opt/TeliCamSDK/lib
     PATH_SUFFIXES ${TELI_PATH_SUFFIXES}
 )
 

@@ -25,8 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PANGOLIN_VAR_H
-#define PANGOLIN_VAR_H
+#pragma once
 
 #include <stdexcept>
 #include <string.h>
@@ -68,7 +67,7 @@ inline void InitialiseNewVarMeta(
     v.Meta().friendly = parts.size() > 0 ? parts[parts.size()-1] : "";
     v.Meta().range[0] = min;
     v.Meta().range[1] = max;
-    if (boostd::is_integral<T>::value) {
+    if (std::is_integral<T>::value) {
         v.Meta().increment = 1.0;
     } else {
         v.Meta().increment = (max - min) / 100.0;
@@ -84,7 +83,7 @@ template<typename T>
 class Var
 {
 public:
-    static void Attach(
+    static T& Attach(
         const std::string& name, T& variable,
         double min, double max, bool logscale = false
     ) {
@@ -98,9 +97,10 @@ public:
             v = nv;
             InitialiseNewVarMeta<T&>(*nv,name,min,max,1,logscale);
         }
+        return variable;
     }
 
-    static void Attach(
+    static T& Attach(
         const std::string& name, T& variable, bool toggle = false
         ) {
         // Find name in VarStore
@@ -114,6 +114,7 @@ public:
             v = nv;
             InitialiseNewVarMeta<T&>(*nv, name, 0.0, 0.0, toggle);
         }
+        return variable;
     }
 
     ~Var()
@@ -211,18 +212,18 @@ public:
         var->Reset();
     }
 
-    const T& Get()
+    const T& Get() const
     {
         try{
             return var->Get();
         }catch(BadInputException)
         {
-            Reset();
+            const_cast<Var<T> *>(this)->Reset();
             return var->Get();
         }
     }
 
-    operator const T& ()
+    operator const T& () const
     {
         return Get();
     }
@@ -274,7 +275,7 @@ protected:
         if( !strcmp(v->TypeId(), typeid(T).name()) ) {
             // Same type
             var = (VarValueT<T>*)(v);
-        }else if( boostd::is_same<T,std::string>::value ) {
+        }else if( std::is_same<T,std::string>::value ) {
             // Use types string accessor
             var = (VarValueT<T>*)(v->str);
         }else if( !strcmp(v->TypeId(), typeid(bool).name() ) ) {
@@ -310,12 +311,11 @@ protected:
     }
 
     // Holds reference to stored variable object
-    VarValueT<T>* var;
+    // N.B. mutable because it is a cached value and Get() is advertised as const.
+    mutable VarValueT<T>* var;
 
     // ptr is non-zero if this object owns the object variable (a wrapper)
     VarValueT<T>* ptr;
 };
 
 }
-
-#endif // PANGOLIN_VAR_H

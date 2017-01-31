@@ -42,6 +42,13 @@
 namespace pangolin
 {
 
+enum DrawingMode
+{
+    DrawingModePoints = GL_POINTS,
+    DrawingModeLine = GL_LINE_STRIP,
+    DrawingModeDashed = GL_LINES,
+};
+
 struct Marker
 {
     enum Direction
@@ -58,13 +65,33 @@ struct Marker
     };
 
     Marker(Direction d, float value, Equality leg = Equal, Colour c = Colour() )
-        : direction(d), value(value), leg(leg), colour(c)
+        : colour(c)
+    {
+        if(d == Horizontal) {
+            range.x = Rangef::Open();
+            range.y = Rangef::Containing(value);
+            if(leg == LessThan) {
+                range.y.Insert(std::numeric_limits<float>::lowest() );
+            }else if(leg == GreaterThan) {
+                range.y.Insert(std::numeric_limits<float>::max() );
+            }
+        }else if(d == Vertical) {
+            range.x = Rangef::Containing(value);
+            range.y = Rangef::Open();
+            if(leg == LessThan) {
+                range.x.Insert(std::numeric_limits<float>::lowest() );
+            }else if(leg == GreaterThan) {
+                range.x.Insert(std::numeric_limits<float>::max() );
+            }
+        }
+    }
+
+    Marker(const XYRangef& range, const Colour& c = Colour() )
+        : range(range), colour(c)
     {
     }
 
-    Direction direction;
-    float value;
-    Equality leg;
+    XYRangef range;
     Colour colour;
 };
 
@@ -72,7 +99,7 @@ class PANGOLIN_EXPORT Plotter : public View, Handler
 {
 public:
     Plotter(
-        DataLog* log,
+        DataLog* default_log,
         float left=0, float right=600, float bottom=-1, float top=1,
         float tickx=30, float ticky=0.5,
         Plotter* linked_plotter_x = 0,
@@ -119,8 +146,34 @@ public:
     void PassiveMouseMotion(View&, int x, int y, int button_state);
     void Special(View&, InputSpecial inType, float x, float y, float p1, float p2, float p3, float p4, int button_state);
 
-    Marker& AddMarker(Marker::Direction d, float value, Marker::Equality leg = Marker::Equal, Colour c = Colour() );
+    /// Remove all current series plots
+    void ClearSeries();
+
+    /// Add series X,Y plot from glsl compatible expressions x_expr, y_expr
+    /// $i refers to integral index of datum in log.
+    /// $0, $1, $2, ... refers to nth series in log.
+    ///    e.g. x_expr = "$i", y_expr = "$0"       // index - data[0] plot
+    ///    e.g. x_expr = "$0", y_expr = "$1"       // data[0], data[1] X-Y plot
+    ///    e.g. x_exptr ="$i", y_expr = "sqrt($1)} // index - sqrt(data[0]) plot
+    void AddSeries(const std::string& x_expr, const std::string& y_expr,
+        DrawingMode drawing_mode = DrawingModeLine, Colour colour = Colour::Unspecified(),
+        const std::string &title = "$y", DataLog* log = nullptr
+    );
+
+    /// Remove all current markers
     void ClearMarkers();
+
+    /// Add horizontal or vertical inequality marker; equal-to, less-than, or greater than.
+    /// This is useful for annotating a critical point or valid region.
+    Marker& AddMarker(
+        Marker::Direction d, float value,
+        Marker::Equality leg = Marker::Equal, Colour c = Colour()
+    );
+
+    Marker& AddMarker( const Marker& marker );
+
+    void ClearImplicitPlots();
+    void AddImplicitPlot();
 
 protected:
     struct PANGOLIN_EXPORT Tick
@@ -149,6 +202,7 @@ protected:
         GlText title;
         bool contains_id;
         std::vector<PlotAttrib> attribs;
+        DataLog* log;
         GLenum drawing_mode;
         Colour colour;
         bool used;
@@ -175,7 +229,7 @@ protected:
     void UpdateView();
     Tick FindTickFactor(float tick);
 
-    DataLog* log;
+    DataLog* default_log;
 
     ColourWheel colour_wheel;
     Colour colour_bg;

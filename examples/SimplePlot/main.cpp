@@ -2,7 +2,7 @@
 
 #include <pangolin/pangolin.h>
 
-int main( int /*argc*/, char* argv[] )
+int main(/*int argc, char* argv[]*/)
 {
   // Create OpenGL window in single line
   pangolin::CreateWindowAndBind("Main",640,480);
@@ -17,12 +17,17 @@ int main( int /*argc*/, char* argv[] )
   labels.push_back(std::string("sin(t)+cos(t)"));
   log.SetLabels(labels);
 
-  const double tinc = 0.01;
+  const float tinc = 0.01f;
 
   // OpenGL 'view' of data. We might have many views of the same data.
-  pangolin::Plotter plotter(&log,0,4*M_PI/tinc,-2,2,M_PI/(4*tinc),0.5);
+  pangolin::Plotter plotter(&log,0.0f,4.0f*(float)M_PI/tinc,-2.0f,2.0f,(float)M_PI/(4.0f*tinc),0.5f);
   plotter.SetBounds(0.0, 1.0, 0.0, 1.0);
   plotter.Track("$i");
+
+  // Add some sample annotations to the plot
+  plotter.AddMarker(pangolin::Marker::Vertical,   -1000, pangolin::Marker::LessThan, pangolin::Colour::Blue().WithAlpha(0.2f) );
+  plotter.AddMarker(pangolin::Marker::Horizontal,   100, pangolin::Marker::GreaterThan, pangolin::Colour::Red().WithAlpha(0.2f) );
+  plotter.AddMarker(pangolin::Marker::Horizontal,    10, pangolin::Marker::Equal, pangolin::Colour::Green().WithAlpha(0.2f) );
 
   pangolin::DisplayBase().AddDisplay(plotter);
 

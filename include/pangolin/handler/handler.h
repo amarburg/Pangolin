@@ -25,11 +25,18 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PANGOLIN_HANDLER_H
-#define PANGOLIN_HANDLER_H
+#pragma once
 
 #include <pangolin/display/opengl_render_state.h>
 #include <pangolin/handler/handler_enums.h>
+
+#if defined(HAVE_EIGEN) && !defined(__CUDACC__) //prevent including Eigen in cuda files
+#define USE_EIGEN
+#endif
+
+#ifdef USE_EIGEN
+#include <Eigen/Core>
+#endif
 
 #ifdef _OSX_
 #define PANGO_DFLT_HANDLER3D_ZF (1.0f/50.0f)
@@ -64,13 +71,23 @@ struct PANGOLIN_EXPORT HandlerScroll : Handler
 struct PANGOLIN_EXPORT Handler3D : Handler
 {
     Handler3D(OpenGlRenderState& cam_state, AxisDirection enforce_up=AxisNone, float trans_scale=0.01f, float zoom_fraction= PANGO_DFLT_HANDLER3D_ZF);
-    
-    virtual void GetPosNormal(View& view, int x, int y, GLprecision p[3], GLprecision Pw[3], GLprecision Pc[3], GLprecision n[3], GLprecision default_z = 1.0);
+
+    virtual bool ValidWinDepth(GLprecision depth);
+    virtual void PixelUnproject( View& view, GLprecision winx, GLprecision winy, GLprecision winz, GLprecision Pc[3]);
+    virtual void GetPosNormal(View& view, int x, int y, GLprecision p[3], GLprecision Pw[3], GLprecision Pc[3], GLprecision nw[3], GLprecision default_z = 1.0);
+
     void Keyboard(View&, unsigned char key, int x, int y, bool pressed);
     void Mouse(View&, MouseButton button, int x, int y, bool pressed, int button_state);
     void MouseMotion(View&, int x, int y, int button_state);
     void Special(View&, InputSpecial inType, float x, float y, float p1, float p2, float p3, float p4, int button_state);
     
+#ifdef USE_EIGEN
+    // Return selected point in world coordinates
+    inline Eigen::Vector3d Selected_P_w() const {
+        return Eigen::Map<const Eigen::Matrix<GLprecision,3,1>>(Pw).cast<double>();
+    }
+#endif
+
 protected:
     OpenGlRenderState* cam_state;
     const static int hwin = 8;
@@ -92,5 +109,3 @@ static Handler StaticHandler;
 static HandlerScroll StaticHandlerScroll;
 
 }
-
-#endif // PANGOLIN_HANDLER_H

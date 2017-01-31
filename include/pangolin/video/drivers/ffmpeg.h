@@ -25,8 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PANGOLIN_FFMPEG_H
-#define PANGOLIN_FFMPEG_H
+#pragma once
 
 #include <pangolin/pangolin.h>
 #include <pangolin/video/video.h>
@@ -45,6 +44,10 @@ extern "C"
 #include <libavutil/pixdesc.h>
 #include <libavcodec/avcodec.h>
 }
+
+#ifndef HAVE_FFMPEG_AVPIXELFORMAT
+#  define AVPixelFormat PixelFormat
+#endif
 
 namespace pangolin
 {
@@ -112,7 +115,7 @@ enum FfmpegMethod
 class PANGOLIN_EXPORT FfmpegConverter : public VideoInterface
 {
 public:
-    FfmpegConverter(VideoInterface* videoin, const std::string pixelfmtout = "RGB24", FfmpegMethod method = FFMPEG_POINT);
+    FfmpegConverter(std::unique_ptr<VideoInterface>& videoin, const std::string pixelfmtout = "RGB24", FfmpegMethod method = FFMPEG_POINT);
     ~FfmpegConverter();
     
     //! Implement VideoInput::Start()
@@ -136,7 +139,7 @@ public:
 protected:
     std::vector<StreamInfo> streams;
     
-    VideoInterface* videoin;
+    std::unique_ptr<VideoInterface> videoin;
     SwsContext *img_convert_ctx;
     
     AVPixelFormat     fmtsrc;
@@ -167,7 +170,8 @@ public:
 
     const std::vector<StreamInfo>& Streams() const;
     void SetStreams(const std::vector<StreamInfo>& streams, const std::string& uri, const json::value& properties);
-    int WriteStreams(unsigned char* data, const json::value& frame_properties);
+    int WriteStreams(const unsigned char* data, const json::value& frame_properties) override;
+    bool IsPipe() const;
     
 protected:
     void Initialise(std::string filename);
@@ -183,9 +187,8 @@ protected:
     int frame_count;
     
     int base_frame_rate;
-    int bit_rate;    
+    int bit_rate;
+    bool is_pipe;
 };
 
 }
-
-#endif //PANGOLIN_FFMPEG_H

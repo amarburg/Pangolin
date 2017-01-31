@@ -77,25 +77,31 @@ void SetPangoVarFromPython(const std::string& name, PyObject* val)
         if (PyFloat_Check(val)) {
             pangolin::Var<double> pango_var(name);
             pango_var = PyFloat_AsDouble(val);
+            pango_var.Meta().gui_changed = true;
         }else if (PyLong_Check(val)) {
             pangolin::Var<long> pango_var(name);
             pango_var = PyLong_AsLong(val);
+            pango_var.Meta().gui_changed = true;
         }else if (PyBool_Check(val)) {
             pangolin::Var<bool> pango_var(name);
             pango_var = (val == Py_True) ? true : false;
+            pango_var.Meta().gui_changed = true;
         }
 #if PY_MAJOR_VERSION >= 3
         else if (PyUnicode_Check(val)) {
             pangolin::Var<std::string> pango_var(name);
             pango_var = PyUnicode_AsUTF8(val);
+            pango_var.Meta().gui_changed = true;
         }
 #else
-        if (PyString_Check(val)) {
+        else if (PyString_Check(val)) {
             pangolin::Var<std::string> pango_var(name);
             pango_var = PyString_AsString(val);
+            pango_var.Meta().gui_changed = true;
         } else if (PyInt_Check(val)) {
             pangolin::Var<int> pango_var(name);
             pango_var = PyInt_AsLong(val);
+            pango_var.Meta().gui_changed = true;
         }
 #endif
         else {
@@ -107,7 +113,9 @@ void SetPangoVarFromPython(const std::string& name, PyObject* val)
 #endif
             pangolin::Var<std::string> pango_var(name);
             pango_var = str;
+            pango_var.Meta().gui_changed = true;
         }
+        FlagVarChanged();
     }catch(std::exception e) {
         pango_print_error("%s\n", e.what());
     }
@@ -133,13 +141,13 @@ struct PyVar {
         delete self;
     }
 
-    static PyObject * Py_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+    static PyObject * Py_new(PyTypeObject *type, PyObject * /*args*/, PyObject * /*kwds*/)
     {
         PyVar* self = new PyVar(type);
         return (PyObject *)self;
     }
 
-    static int Py_init(PyVar *self, PyObject *args, PyObject *kwds)
+    static int Py_init(PyVar *self, PyObject *args, PyObject * /*kwds*/)
     {
         char* cNamespace = 0;
         if (!PyArg_ParseTuple(args, "s", &cNamespace))
@@ -245,6 +253,15 @@ struct PyVar {
     (initproc)PyVar::Py_init,                 /* tp_init */
     0,                                        /* tp_alloc */
     (newfunc)PyVar::Py_new,                   /* tp_new */
+    0,                                        /* tp_free */
+    0,                                        /* tp_is_gc */
+    0,                                        /* tp_bases */
+    0,                                        /* tp_mro */
+    0,                                        /* tp_cache */
+    0,                                        /* tp_subclasses */
+    0,                                        /* tp_weaklist */
+    0,                                        /* tp_del */
+    0                                         /* tp_version_tag */
 };
 
 }

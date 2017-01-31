@@ -25,8 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PANGOLIN_VARVALUEGENERIC_H
-#define PANGOLIN_VARVALUEGENERIC_H
+#pragma once
 
 #include <string>
 
@@ -35,6 +34,17 @@ namespace pangolin
 
 struct VarMeta
 {
+    VarMeta() :
+        increment(0.),
+        flags(0),
+        gui_changed(false),
+        logscale(false),
+        generic(false)
+    {
+        range[0] = 0.;
+        range[1] = 0.;
+    }
+
     std::string full_name;
     std::string friendly;
     double range[2];
@@ -72,5 +82,3 @@ public:
 };
 
 }
-
-#endif // PANGOLIN_VARVALUEGENERIC_H

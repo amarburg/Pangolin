@@ -54,12 +54,12 @@ ConsoleView::ConsoleView(ConsoleInterpreter* interpreter)
 {
     SetHandler(this);
 
-    line_colours[ConsoleLineTypeCmd]        = Colour(1.0,1.0,1.0,1.0);
-    line_colours[ConsoleLineTypeCmdOptions] = Colour(0.9,0.9,0.9,1.0);
-    line_colours[ConsoleLineTypeOutput]     = Colour(0.0,1.0,1.0,1.0);
-    line_colours[ConsoleLineTypeHelp]       = Colour(1.0,0.8,1.0,1.0);
-    line_colours[ConsoleLineTypeStdout]     = Colour(0.0,0.0,1.0,1.0);
-    line_colours[ConsoleLineTypeStderr]     = Colour(1.0,0.8,0.8,1.0);
+    line_colours[ConsoleLineTypeCmd]        = Colour(1.0f,1.0f,1.0f,1.0f);
+    line_colours[ConsoleLineTypeCmdOptions] = Colour(0.9f,0.9f,0.9f,1.0f);
+    line_colours[ConsoleLineTypeOutput]     = Colour(0.0f,1.0f,1.0f,1.0f);
+    line_colours[ConsoleLineTypeHelp]       = Colour(1.0f,0.8f,1.0f,1.0f);
+    line_colours[ConsoleLineTypeStdout]     = Colour(0.0f,0.0f,1.0f,1.0f);
+    line_colours[ConsoleLineTypeStderr]     = Colour(1.0f,0.8f,0.8f,1.0f);
 
     Var<Colour>::Attach("pango.console.colours.Background", background_colour);
     Var<Colour>::Attach("pango.console.colours.Cmd",        line_colours[ConsoleLineTypeCmd]);
@@ -87,6 +87,12 @@ void ConsoleView::ProcessOutputLines()
     {
         AddLine(line_in.text, line_in.linetype);
     }
+}
+
+View& ConsoleView::ShowWithoutAnimation(bool should_show){
+    Show(should_show);
+    bottom = show ? 1.0 : 0.0;
+    return *this;
 }
 
 View& ConsoleView::Show(bool should_show)
@@ -195,7 +201,7 @@ inline std::string CommonPrefix(const std::vector<std::string>& vec)
     return vec[0].substr(0,cmn);
 }
 
-void ConsoleView::Keyboard(View&, unsigned char key, int x, int y, bool pressed)
+void ConsoleView::Keyboard(View&, unsigned char key, int /*x*/, int /*y*/, bool pressed)
 {
     static int hist_id = -1;
     static std::string prefix;

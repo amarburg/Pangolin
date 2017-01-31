@@ -26,6 +26,8 @@
  */
 
 #include <pangolin/utils/threadedfilebuf.h>
+#include <pangolin/utils/file_utils.h>
+#include <pangolin/utils/sigstate.h>
 
 #include <cstring>
 #include <stdexcept>
@@ -36,18 +38,20 @@ namespace pangolin
 {
 
 threadedfilebuf::threadedfilebuf()
-    : mem_buffer(0), mem_size(0), mem_max_size(0), mem_start(0), mem_end(0), should_run(false)
+    : mem_buffer(0), mem_size(0), mem_max_size(0), mem_start(0), mem_end(0), should_run(false), is_pipe(false)
 {
 }
 
-threadedfilebuf::threadedfilebuf( const std::string& filename, unsigned int buffer_size_bytes )
-    : mem_buffer(0), mem_size(0), mem_max_size(0), mem_start(0), mem_end(0), should_run(false)
+threadedfilebuf::threadedfilebuf(const std::string& filename, size_t buffer_size_bytes )
+    : mem_buffer(0), mem_size(0), mem_max_size(0), mem_start(0), mem_end(0), should_run(false), is_pipe(pangolin::IsPipe(filename))
 {
     open(filename, buffer_size_bytes);
 }
 
-void threadedfilebuf::open(const std::string& filename, unsigned int buffer_size_bytes)
+void threadedfilebuf::open(const std::string& filename, size_t buffer_size_bytes)
 {
+    is_pipe = pangolin::IsPipe(filename);
+
     if (file.is_open()) {
         close();
     }
@@ -61,22 +65,43 @@ void threadedfilebuf::open(const std::string& filename, unsigned int buffer_size
     mem_size = 0;
     mem_start = 0;
     mem_end = 0;
-    mem_max_size = buffer_size_bytes;
-    mem_buffer = new char[(size_t)mem_max_size];
+    mem_max_size = static_cast<std::streamsize>(buffer_size_bytes);
+    mem_buffer = new char[static_cast<size_t>(mem_max_size)];
 
     should_run = true;
-    write_thread = boostd::thread(boostd::ref(*this));
+    write_thread = std::thread(std::ref(*this));
 }
 
 void threadedfilebuf::close()
 {
     should_run = false;
+
     cond_queued.notify_all();
 
-    write_thread.join();
+    if(write_thread.joinable())
+    {
+        write_thread.join();
+    }
 
-    if (mem_buffer) delete mem_buffer;
+    if(mem_buffer)
+    {
+        delete mem_buffer;
+        mem_buffer = 0;
+    }
+
     file.close();
+}
+
+void threadedfilebuf::soft_close()
+{
+    // Forces sputn to write no bytes and exit early, results in lost data
+    mem_size = 0;
+}
+
+void threadedfilebuf::force_close()
+{
+    soft_close();
+    close();
 }
 
 threadedfilebuf::~threadedfilebuf()
@@ -87,7 +112,7 @@ threadedfilebuf::~threadedfilebuf()
 std::streamsize threadedfilebuf::xsputn(const char* data, std::streamsize num_bytes)
 {
     if( num_bytes > mem_max_size ) {
-        boostd::unique_lock<boostd::mutex> lock(update_mutex);
+        std::unique_lock<std::mutex> lock(update_mutex);
         // Wait until queue is empty
         while( mem_size > 0 ) {
             cond_dequeued.wait(lock);
@@ -98,11 +123,11 @@ std::streamsize threadedfilebuf::xsputn(const char* data, std::streamsize num_by
         mem_start = 0;
         mem_end = 0;
         mem_max_size = num_bytes * 4;
-        mem_buffer = new char[(size_t)mem_max_size];
+        mem_buffer = new char[static_cast<size_t>(mem_max_size)];
     }
 
     {
-        boostd::unique_lock<boostd::mutex> lock(update_mutex);
+        std::unique_lock<std::mutex> lock(update_mutex);
         
         // wait until there is space to write into buffer
         while( mem_size + num_bytes > mem_max_size ) {
@@ -116,7 +141,7 @@ std::streamsize threadedfilebuf::xsputn(const char* data, std::streamsize num_by
         if( num_bytes <= array_a_size )
         {
             // copy in one
-            memcpy(mem_buffer + mem_end, data, (size_t)num_bytes);
+            memcpy(mem_buffer + mem_end, data, static_cast<size_t>(num_bytes));
             mem_end += num_bytes;
             mem_size += num_bytes;
         }else{
@@ -133,6 +158,7 @@ std::streamsize threadedfilebuf::xsputn(const char* data, std::streamsize num_by
     
     cond_queued.notify_one();
     
+    input_pos += num_bytes;
     return num_bytes;
 }
 
@@ -141,7 +167,7 @@ int threadedfilebuf::overflow(int c)
     const std::streamsize num_bytes = 1;
 
     {
-        boostd::unique_lock<boostd::mutex> lock(update_mutex);
+        std::unique_lock<std::mutex> lock(update_mutex);
 
         // wait until there is space to write into buffer
         while( mem_size + num_bytes > mem_max_size ) {
@@ -159,7 +185,19 @@ int threadedfilebuf::overflow(int c)
 
     cond_queued.notify_one();
 
+    input_pos += num_bytes;
     return num_bytes;
+}
+
+std::streampos threadedfilebuf::seekoff(
+    std::streamoff off, std::ios_base::seekdir way,
+    std::ios_base::openmode /*which*/
+) {
+    if(off == 0 && way == ios_base::cur) {
+        return input_pos;
+    }else{
+        return -1;
+    }
 }
 
 void threadedfilebuf::operator()()
@@ -168,8 +206,23 @@ void threadedfilebuf::operator()()
     
     while(true)
     {
+        if(is_pipe)
         {
-            boostd::unique_lock<boostd::mutex> lock(update_mutex);
+            try
+            {
+                if(SigState::I().sig_callbacks.at(SIGPIPE).value)
+                {
+                    soft_close();
+                    return;
+                }
+            } catch(std::out_of_range&)
+            {
+//                std::cout << "Please register a SIGPIPE handler for your writer" << std::endl;
+            }
+        }
+
+        {
+            std::unique_lock<std::mutex> lock(update_mutex);
             
             while( mem_size == 0 ) {
                 if(!should_run) return;
@@ -181,12 +234,12 @@ void threadedfilebuf::operator()()
                         mem_end - mem_start :
                         mem_max_size - mem_start;
         }
-        
+
         std::streamsize bytes_written =
                 file.sputn(mem_buffer + mem_start, data_to_write );
-        
+
         {
-            boostd::unique_lock<boostd::mutex> lock(update_mutex);
+            std::unique_lock<std::mutex> lock(update_mutex);
             
             mem_size -= bytes_written;
             mem_start += bytes_written;

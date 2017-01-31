@@ -25,8 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PANGOLIN_VIDEO_IMAGES_H
-#define PANGOLIN_VIDEO_IMAGES_H
+#pragma once
 
 #include <pangolin/pangolin.h>
 #include <pangolin/video/video.h>
@@ -39,29 +38,41 @@ namespace pangolin
 {
 
 // Video class that outputs test video signal.
-class PANGOLIN_EXPORT ImagesVideo : public VideoInterface
+class PANGOLIN_EXPORT ImagesVideo : public VideoInterface, public VideoPlaybackInterface
 {
 public:
     ImagesVideo(const std::string& wildcard_path);
+    ImagesVideo(const std::string& wildcard_path, const PixelFormat& raw_fmt, size_t raw_width, size_t raw_height);
+
     ~ImagesVideo();
+
+    // Implement VideoInterface
     
     //! Implement VideoInput::Start()
-    void Start();
+    void Start() override;
     
     //! Implement VideoInput::Stop()
-    void Stop();
+    void Stop() override;
 
     //! Implement VideoInput::SizeBytes()
-    size_t SizeBytes() const;
+    size_t SizeBytes() const override;
 
     //! Implement VideoInput::Streams()
-    const std::vector<StreamInfo>& Streams() const;
+    const std::vector<StreamInfo>& Streams() const override;
     
     //! Implement VideoInput::GrabNext()
-    bool GrabNext( unsigned char* image, bool wait = true );
+    bool GrabNext( unsigned char* image, bool wait = true ) override;
     
     //! Implement VideoInput::GrabNewest()
-    bool GrabNewest( unsigned char* image, bool wait = true );
+    bool GrabNewest( unsigned char* image, bool wait = true ) override;
+
+    // Implement VideoPlaybackInterface
+
+    int GetCurrentFrameId() const override;
+
+    int GetTotalFrames() const override;
+
+    int Seek(int frameid) override;
     
 protected:
     typedef std::vector<TypedImage> Frame;
@@ -70,20 +81,25 @@ protected:
         return filenames[channelNum][frameNum];
     }
     
-    bool QueueFrame();
+    void PopulateFilenames(const std::string& wildcard_path);
+
+    bool LoadFrame(size_t i);
+
+    void ConfigureStreamSizes();
     
     std::vector<StreamInfo> streams;
     size_t size_bytes;
     
-    
     int num_files;
     size_t num_channels;
+    size_t next_frame_id;
     std::vector<std::vector<std::string> > filenames;
-    
-    int num_loaded;
-    std::deque<Frame> loaded;
+    std::vector<Frame> loaded;
+
+    bool unknowns_are_raw;
+    PixelFormat raw_fmt;
+    size_t raw_width;
+    size_t raw_height;
 };
 
 }
-
-#endif // PANGOLIN_VIDEO_IMAGES_H

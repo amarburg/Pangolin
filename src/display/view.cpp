@@ -31,6 +31,7 @@
 #include <pangolin/display/display_internal.h>
 #include <pangolin/display/view.h>
 #include <pangolin/display/viewport.h>
+#include <pangolin/display/opengl_render_state.h>
 
 #include <stdexcept>
 
@@ -59,6 +60,8 @@ double AspectAreaWithinTarget(double target, double test)
 
 void SaveViewFromFbo(std::string prefix, View& view, float scale)
 {
+    PANGOLIN_UNUSED(prefix);
+    
 #ifndef HAVE_GLES
     const Viewport orig = view.v;
     view.v.l = 0;
@@ -89,14 +92,12 @@ void SaveViewFromFbo(std::string prefix, View& view, float scale)
     glFlush();
 
 #ifdef HAVE_PNG
-    Image<unsigned char> buffer;
-    VideoPixelFormat fmt = VideoFormatFromString("RGBA");
-    buffer.Alloc(w, h, w * fmt.bpp/8 );
+    const PixelFormat fmt = PixelFormatFromString("RGBA32");
+    TypedImage buffer(w, h, fmt );
     glReadBuffer(GL_BACK);
     glPixelStorei(GL_PACK_ALIGNMENT, 1); // TODO: Avoid this?
     glReadPixels(0,0,w,h, GL_RGBA, GL_UNSIGNED_BYTE, buffer.ptr );
     SaveImage(buffer, fmt, prefix + ".png", false);
-    buffer.Dealloc();
 #endif // HAVE_PNG
     
     // unbind FBO
@@ -505,8 +506,8 @@ void View::RecordOnRender(const std::string& record_uri)
         context->record_view = this;
         context->recorder.Open(record_uri);
         std::vector<StreamInfo> streams;
-        const VideoPixelFormat fmt = VideoFormatFromString("RGB24");
-        streams.push_back( StreamInfo(fmt, area.w, area.h, area.w * fmt.bpp) );
+        const PixelFormat fmt = PixelFormatFromString("RGB24");
+        streams.push_back( StreamInfo(fmt, area.w, area.h, area.w * fmt.bpp / 8) );
         context->recorder.SetStreams(streams);
     }else{
         context->recorder.Close();
@@ -573,7 +574,7 @@ View& View::SetHandler(Handler* h)
     return *this;
 }
 
-View& View::SetDrawFunction(const boostd::function<void(View&)>& drawFunc)
+View& View::SetDrawFunction(const std::function<void(View&)>& drawFunc)
 {
     extern_draw_function = drawFunc;
     return *this;

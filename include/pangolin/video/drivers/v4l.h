@@ -25,8 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PANGOLIN_V4L_H
-#define PANGOLIN_V4L_H
+#pragma once
 
 #include <pangolin/pangolin.h>
 #include <pangolin/video/video.h>
@@ -75,6 +74,8 @@ public:
     //! Implement VideoUvcInterface::IoCtrl()
     int IoCtrl(uint8_t unit, uint8_t ctrl, unsigned char* data, int len, UvcRequestCode req_code);
 
+    void SetExposureUs(int exposure_us);
+
     int GetFileDescriptor() const{
         return fd;
     }
@@ -107,5 +108,3 @@ protected:
 };
 
 }
-
-#endif // PANGOLIN_V4L_H

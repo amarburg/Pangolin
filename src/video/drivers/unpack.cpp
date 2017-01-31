@@ -26,30 +26,39 @@
  */
 
 #include <pangolin/video/drivers/unpack.h>
+#include <pangolin/factory/factory_registry.h>
+#include <pangolin/video/iostream_operators.h>
+
+#ifdef DEBUGUNPACK
+  #include <pangolin/utils/timer.h>
+  #define TSTART() pangolin::basetime start,last,now; start = pangolin::TimeNow(); last = start;
+  #define TGRABANDPRINT(...)  now = pangolin::TimeNow(); fprintf(stderr,"UNPACK: "); fprintf(stderr, __VA_ARGS__); fprintf(stderr, " %fms.\n",1000*pangolin::TimeDiff_s(last, now)); last = now;
+  #define DBGPRINT(...) fprintf(stderr,"UNPACK: "); fprintf(stderr, __VA_ARGS__); fprintf(stderr,"\n");
+#else
+  #define TSTART()
+  #define TGRABANDPRINT(...)
+  #define DBGPRINT(...)
+#endif
 
 namespace pangolin
 {
 
-UnpackVideo::UnpackVideo(VideoInterface* src, VideoPixelFormat out_fmt)
-    : size_bytes(0), buffer(0)
+UnpackVideo::UnpackVideo(std::unique_ptr<VideoInterface> &src_, PixelFormat out_fmt)
+    : src(std::move(src_)), size_bytes(0), buffer(0)
 {
-    if(!src) {
-        throw VideoException("UnpackVideo: VideoInterface in must not be null");
-    }
-
-    if( out_fmt.channels != 1) {
+    if( !src || out_fmt.channels != 1) {
         throw VideoException("UnpackVideo: Only supports single channel output.");
     }
 
-    videoin.push_back(src);
+    videoin.push_back(src.get());
 
     for(size_t s=0; s< src->Streams().size(); ++s) {
         const size_t w = src->Streams()[s].Width();
         const size_t h = src->Streams()[s].Height();
 
         // Check compatibility of formats
-        const VideoPixelFormat in_fmt = src->Streams()[s].PixFormat();
-        if(in_fmt.channels > 1 || in_fmt.bpp <9 || in_fmt.bpp > 16) {
+        const PixelFormat in_fmt = src->Streams()[s].PixFormat();
+        if(in_fmt.channels > 1 || in_fmt.bpp > 16) {
             throw VideoException("UnpackVideo: Only supports one channel input.");
         }
 
@@ -64,7 +73,6 @@ UnpackVideo::UnpackVideo(VideoInterface* src, VideoPixelFormat out_fmt)
 UnpackVideo::~UnpackVideo()
 {
     delete[] buffer;
-    delete videoin[0];
 }
 
 //! Implement VideoInput::Start()
@@ -89,6 +97,21 @@ size_t UnpackVideo::SizeBytes() const
 const std::vector<StreamInfo>& UnpackVideo::Streams() const
 {
     return streams;
+}
+
+template<typename T>
+void ConvertFrom8bit(
+    Image<unsigned char>& out,
+    const Image<unsigned char>& in
+) {
+    for(size_t r=0; r<out.h; ++r) {
+        T* pout = (T*)(out.ptr + r*out.pitch);
+        uint8_t* pin = in.ptr + r*in.pitch;
+        const uint8_t* pin_end = in.ptr + (r+1)*in.pitch;
+        while(pin != pin_end) {
+            *(pout++) = *(pin++);
+        }
+    }
 }
 
 template<typename T>
@@ -133,35 +156,46 @@ void ConvertFrom12bit(
     }
 }
 
+void UnpackVideo::Process(unsigned char* image, const unsigned char* buffer)
+{
+    TSTART()
+    for(size_t s=0; s<streams.size(); ++s) {
+        const Image<unsigned char> img_in  = videoin[0]->Streams()[s].StreamImage(buffer);
+        Image<unsigned char> img_out = Streams()[s].StreamImage(image);
+
+        const int bits_in  = videoin[0]->Streams()[s].PixFormat().bpp;
+
+        if(Streams()[s].PixFormat().format == "GRAY32F") {
+            if( bits_in == 8) {
+                ConvertFrom8bit<float>(img_out, img_in);
+            }else if( bits_in == 10) {
+                ConvertFrom10bit<float>(img_out, img_in);
+            }else if( bits_in == 12){
+                ConvertFrom12bit<float>(img_out, img_in);
+            }else{
+                throw pangolin::VideoException("Unsupported bitdepths.");
+            }
+        }else if(Streams()[s].PixFormat().format == "GRAY16LE") {
+            if( bits_in == 8) {
+                ConvertFrom8bit<uint16_t>(img_out, img_in);
+            }else if( bits_in == 10) {
+                ConvertFrom10bit<uint16_t>(img_out, img_in);
+            }else if( bits_in == 12){
+                ConvertFrom12bit<uint16_t>(img_out, img_in);
+            }else{
+                throw pangolin::VideoException("Unsupported bitdepths.");
+            }
+        }else{
+        }
+    }
+    TGRABANDPRINT("Unpacking took ")
+}
+
 //! Implement VideoInput::GrabNext()
 bool UnpackVideo::GrabNext( unsigned char* image, bool wait )
 {    
     if(videoin[0]->GrabNext(buffer,wait)) {
-        for(size_t s=0; s<streams.size(); ++s) {
-            Image<unsigned char> img_in  = videoin[0]->Streams()[s].StreamImage(buffer);
-            Image<unsigned char> img_out = Streams()[s].StreamImage(image);
-
-            const int bits_in  = videoin[0]->Streams()[s].PixFormat().bpp;
-
-            if(Streams()[s].PixFormat().format == "GRAY32F") {
-                if( bits_in == 10) {
-                    ConvertFrom10bit<float>(img_out, img_in);
-                }else if( bits_in == 12){
-                    ConvertFrom12bit<float>(img_out, img_in);
-                }else{
-                    throw pangolin::VideoException("Unsupported bitdepths.");
-                }
-            }else if(Streams()[s].PixFormat().format == "GRAY16LE") {
-                if( bits_in == 10) {
-                    ConvertFrom10bit<uint16_t>(img_out, img_in);
-                }else if( bits_in == 12){
-                    ConvertFrom12bit<uint16_t>(img_out, img_in);
-                }else{
-                    throw pangolin::VideoException("Unsupported bitdepths.");
-                }
-            }else{
-            }
-        }
+        Process(image,buffer);
         return true;
     }else{
         return false;
@@ -171,7 +205,12 @@ bool UnpackVideo::GrabNext( unsigned char* image, bool wait )
 //! Implement VideoInput::GrabNewest()
 bool UnpackVideo::GrabNewest( unsigned char* image, bool wait )
 {
-    return GrabNext(image,wait);
+    if(videoin[0]->GrabNewest(buffer,wait)) {
+        Process(image,buffer);
+        return true;
+    }else{
+        return false;
+    }
 }
 
 std::vector<VideoInterface*>& UnpackVideo::InputStreams()
@@ -179,5 +218,51 @@ std::vector<VideoInterface*>& UnpackVideo::InputStreams()
     return videoin;
 }
 
+unsigned int UnpackVideo::AvailableFrames() const
+{
+    BufferAwareVideoInterface* vpi = dynamic_cast<BufferAwareVideoInterface*>(videoin[0]);
+    if(!vpi)
+    {
+        pango_print_warn("Unpack: child interface is not buffer aware.");
+        return 0;
+    }
+    else
+    {
+        return vpi->AvailableFrames();
+    }
+}
+
+bool UnpackVideo::DropNFrames(uint32_t n)
+{
+    BufferAwareVideoInterface* vpi = dynamic_cast<BufferAwareVideoInterface*>(videoin[0]);
+    if(!vpi)
+    {
+        pango_print_warn("Unpack: child interface is not buffer aware.");
+        return false;
+    }
+    else
+    {
+        return vpi->DropNFrames(n);
+    }
+}
+
+PANGOLIN_REGISTER_FACTORY(UnpackVideo)
+{
+    struct UnpackVideoFactory : public FactoryInterface<VideoInterface> {
+        std::unique_ptr<VideoInterface> Open(const Uri& uri) override {
+            std::unique_ptr<VideoInterface> subvid = pangolin::OpenVideo(uri.url);
+            const std::string fmt = uri.Get("fmt", std::string("GRAY16LE") );
+            return std::unique_ptr<VideoInterface>(
+                new UnpackVideo(subvid, PixelFormatFromString(fmt) )
+            );
+        }
+    };
+
+    FactoryRegistry<VideoInterface>::I().RegisterFactory(std::make_shared<UnpackVideoFactory>(), 10, "unpack");
+}
 
 }
+
+#undef TSTART
+#undef TGRABANDPRINT
+#undef DBGPRINT

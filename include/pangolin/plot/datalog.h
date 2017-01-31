@@ -25,8 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PANGOLIN_DATALOG_H
-#define PANGOLIN_DATALOG_H
+#pragma once
 
 #include <pangolin/platform.h>
 
@@ -34,17 +33,52 @@
 #include <vector>
 #include <string>
 #include <limits>
+#include <memory>
+#include <algorithm> // std::min, std::max
 
 #if defined(HAVE_EIGEN) && !defined(__CUDACC__) //prevent including Eigen in cuda files
 #define USE_EIGEN
 #endif
 
 #ifdef USE_EIGEN
-#include <Eigen/Eigen>
+#include <Eigen/Core>
 #endif
 
 namespace pangolin
 {
+
+/// Simple statistics recorded for a logged input dimension.
+struct DimensionStats
+{
+    DimensionStats()
+    {
+        Reset();
+    }
+
+    void Reset()
+    {
+        isMonotonic = true;
+        sum = 0.0f;
+        sum_sq = 0.0f;
+        min = std::numeric_limits<float>::max();
+        max = std::numeric_limits<float>::lowest();
+    }
+
+    void Add(const float v)
+    {
+        isMonotonic = isMonotonic && (v >= max);
+        sum += v;
+        sum_sq += v*v;
+        min = std::min(min, v);
+        max = std::max(max, v);
+    }
+
+    bool isMonotonic;
+    float sum;
+    float sum_sq;
+    float min;
+    float max;
+};
 
 class DataLogBlock
 {
@@ -54,14 +88,14 @@ public:
     /// @param start_id: index of first sample (from entire dataset) in this buffer
     DataLogBlock(size_t dim, size_t max_samples, size_t start_id)
         : dim(dim), max_samples(max_samples), samples(0),
-          start_id(start_id), sample_buffer(0), nextBlock(0)
+          start_id(start_id)
     {
-        sample_buffer = new float[dim*max_samples];
+        sample_buffer = std::unique_ptr<float[]>(new float[dim*max_samples]);
+//        stats = std::unique_ptr<DimensionStats[]>(new DimensionStats[dim]);
     }
 
     ~DataLogBlock()
     {
-        delete[] sample_buffer;
     }
 
     size_t Samples() const
@@ -92,14 +126,12 @@ public:
     void ClearLinked()
     {
         samples = 0;
-        if(nextBlock) {
-            delete nextBlock;
-        }
+        nextBlock.reset();
     }
 
     DataLogBlock* NextBlock() const
     {
-        return nextBlock;
+        return nextBlock.get();
     }
 
     size_t StartId() const
@@ -109,7 +141,7 @@ public:
 
     float* DimData(size_t d) const
     {
-        return sample_buffer + d;
+        return sample_buffer.get() + d;
     }
 
     size_t Dimensions() const
@@ -122,7 +154,7 @@ public:
         const int id = (int)n - (int)start_id;
 
         if( 0 <= id && id < (int)samples ) {
-            return sample_buffer + dim*id;
+            return sample_buffer.get() + dim*id;
         }else{
             if(nextBlock) {
                 return nextBlock->Sample(n);
@@ -137,25 +169,9 @@ protected:
     size_t max_samples;
     size_t samples;
     size_t start_id;
-    float* sample_buffer;
-    DataLogBlock* nextBlock;
-};
-
-/// Simple statistics recorded for a logged input dimension.
-struct DimensionStats
-{
-    DimensionStats()
-        : isMonotonic(true), sum(0.0f), sum_sq(0.0f),
-          min(std::numeric_limits<float>::max()),
-          max(-std::numeric_limits<float>::max())
-    {
-    }
-
-    bool isMonotonic;
-    float sum;
-    float sum_sq;
-    float min;
-    float max;
+    std::unique_ptr<float[]> sample_buffer;
+//    std::unique_ptr<DimensionStats[]> stats;
+    std::unique_ptr<DataLogBlock> nextBlock;
 };
 
 /// A DataLog can efficiently record floating point sample data of any size.
@@ -173,7 +189,7 @@ public:
     void SetLabels(const std::vector<std::string> & labels);
     const std::vector<std::string>& Labels() const;
 
-    void Log(unsigned int dimension, const float * vals, unsigned int samples = 1);
+    void Log(size_t dimension, const float * vals, unsigned int samples = 1);
     void Log(float v);
     void Log(float v1, float v2);
     void Log(float v1, float v2, float v3);
@@ -204,7 +220,7 @@ public:
     const DataLogBlock* LastBlock() const;
 
     // Return number of samples stored in this DataLog
-    unsigned int Samples() const;
+    size_t Samples() const;
 
     // Return pointer to stored sample n
     const float* Sample(int n) const;
@@ -222,5 +238,3 @@ protected:
 };
 
 }
-
-#endif // PANGOLIN_DATALOG_H

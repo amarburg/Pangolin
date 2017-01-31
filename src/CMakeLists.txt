@@ -6,7 +6,6 @@ macro( append_glob list glob )
     set(${list} "${${list}};${files}")
 endmacro()
 
-
 ## Header only includes / core headers
 set( INCDIR "../include/pangolin" )
 set( HEADERS
@@ -21,6 +20,10 @@ append_glob(HEADERS ${INCDIR}/log/*.h*)
 append_glob(SOURCES utils/*.cpp)
 append_glob(SOURCES image/*.cpp)
 append_glob(SOURCES log/*.cpp)
+
+### Store list of Video factory registery methods to call for init.
+include(CreateMethodCallFile)
+set( VIDEO_FACTORY_REG "" )
 
 #######################################################
 ## User build options
@@ -39,6 +42,7 @@ if(BUILD_PANGOLIN_GUI)
     append_glob(HEADERS ${INCDIR}/plot/*.h*)
     append_glob(SOURCES plot/*.cpp)
   endif()
+
 endif()
 
 option(BUILD_PANGOLIN_VARS "Build support for Pangolin Vars" ON)
@@ -62,27 +66,66 @@ if(BUILD_PANGOLIN_VIDEO)
   list(APPEND HEADERS
     ${INCDIR}/video/drivers/test.h
     ${INCDIR}/video/drivers/images.h
-    ${INCDIR}/video/drivers/video_splitter.h
-    ${INCDIR}/video/drivers/pvn_video.h
-    ${INCDIR}/video/drivers/pango_video.h
+    ${INCDIR}/video/drivers/split.h
+    ${INCDIR}/video/drivers/pvn.h
+    ${INCDIR}/video/drivers/pango.h
     ${INCDIR}/video/drivers/pango_video_output.h
     ${INCDIR}/video/drivers/debayer.h
     ${INCDIR}/video/drivers/shift.h
+    ${INCDIR}/video/drivers/mirror.h
     ${INCDIR}/video/drivers/unpack.h
     ${INCDIR}/video/drivers/join.h
+    ${INCDIR}/video/drivers/merge.h
+    ${INCDIR}/video/drivers/thread.h
   )
   list(APPEND SOURCES
     video/drivers/test.cpp
     video/drivers/images.cpp
-    video/drivers/video_splitter.cpp
-    video/drivers/pvn_video.cpp
-    video/drivers/pango_video.cpp
+    video/drivers/split.cpp
+    video/drivers/pvn.cpp
+    video/drivers/pango.cpp
     video/drivers/pango_video_output.cpp
     video/drivers/debayer.cpp
     video/drivers/shift.cpp
+    video/drivers/mirror.cpp
     video/drivers/unpack.cpp
     video/drivers/join.cpp
+    video/drivers/merge.cpp
+    video/drivers/json.cpp
+    video/drivers/thread.cpp
   )
+
+  list(APPEND VIDEO_FACTORY_REG
+    RegisterTestVideoFactory
+    RegisterImagesVideoFactory
+    RegisterSplitVideoFactory
+    RegisterPvnVideoFactory
+    RegisterPangoVideoFactory
+    RegisterPangoVideoOutputFactory
+    RegisterDebayerVideoFactory
+    RegisterShiftVideoFactory
+    RegisterMirrorVideoFactory
+    RegisterUnpackVideoFactory
+    RegisterJoinVideoFactory
+    RegisterMergeVideoFactory
+    RegisterJsonVideoFactory
+    RegisterThreadVideoFactory
+  )
+
+  if(UNIX)
+    list(APPEND HEADERS ${INCDIR}/video/drivers/shared_memory.h)
+    list(APPEND SOURCES video/drivers/shared_memory.cpp)
+    if(_LINUX_)
+      # Required for shared memory API using some versions of glibc
+      list(APPEND LINK_LIBS rt pthread)
+    endif()
+  endif()
+
+endif()
+
+if(BUILD_PANGOLIN_GUI AND BUILD_PANGOLIN_VARS AND BUILD_PANGOLIN_VIDEO )
+    list(APPEND HEADERS ${INCDIR}/tools/video_viewer.h)
+    list(APPEND SOURCES tools/video_viewer.cpp)
 endif()
 
 #######################################################
@@ -90,13 +133,6 @@ endif()
 
 # Project headers trump everything (including any potentially installed Pangolin)
 list(APPEND LIB_INC_DIR  "${PROJECT_SOURCE_DIR}/include;${CMAKE_CURRENT_BINARY_DIR}/include" )
-
-if(NOT CPP11_NO_BOOST)
-    # Boost is required when c++11 is disabled
-    find_package(Boost COMPONENTS thread filesystem system REQUIRED QUIET)
-    list(APPEND USER_INC  "${Boost_INCLUDE_DIRS}" )
-    list(APPEND LINK_LIBS "${Boost_LIBRARIES}" )
-endif()
 
 if(BUILD_PANGOLIN_GUI)
     if( ANDROID  )
@@ -186,17 +222,24 @@ else()
         elseif(_WIN_)
             list(APPEND SOURCES display/device/display_win.cpp )
         elseif(_OSX_)
-            list(APPEND SOURCES display/device/display_osx.mm )
+            list(APPEND SOURCES display/device/display_osx.mm display/device/PangolinNSApplication.mm display/device/PangolinNSGLView.mm  )
             list(APPEND LINK_LIBS "-framework Cocoa" )
         elseif(_LINUX_)
+            find_package(X11 REQUIRED)
+            list(APPEND USER_INC ${X11_INCLUDE_DIR})
             list(APPEND SOURCES display/device/display_x11.cpp )
-            list(APPEND LINK_LIBS -lX11 )
+            list(APPEND LINK_LIBS ${X11_LIBRARIES} )
         endif()
     endif()
 endif()
 
+if(UNIX)
+  append_glob(HEADERS ${INCDIR}/utils/posix/*.h*)
+  append_glob(SOURCES utils/posix/*.cpp)
+endif()
+
 find_package(PythonLibs QUIET)
-if(BUILD_PANGOLIN_GUI AND BUILD_PANGOLIN_VARS AND PYTHONLIBS_FOUND)
+if(BUILD_PANGOLIN_GUI AND BUILD_PANGOLIN_VARS AND PYTHONLIBS_FOUND AND NOT _WIN_)
   set(HAVE_PYTHON 1)
   list(APPEND HEADERS
     ${INCDIR}/console/ConsoleInterpreter.h
@@ -210,9 +253,11 @@ if(BUILD_PANGOLIN_GUI AND BUILD_PANGOLIN_VARS AND PYTHONLIBS_FOUND)
   list(APPEND SOURCES
     console/ConsoleView.cpp
     python/PyInterpreter.cpp
+    python/PyModulePangolin.cpp
   )
   if(_GCC_)
-    set_source_files_properties(python/PyInterpreter.cpp PROPERTIES COMPILE_FLAGS -fno-strict-aliasing)
+    set_source_files_properties(python/PyInterpreter.cpp    PROPERTIES COMPILE_FLAGS "-Wno-missing-field-initializers")
+    set_source_files_properties(python/PyModulePangolin.cpp PROPERTIES COMPILE_FLAGS "-fno-strict-aliasing -Wno-missing-field-initializers")
   endif()
   list(APPEND INTERNAL_INC ${PYTHON_INCLUDE_DIR})
   list(APPEND LINK_LIBS    ${PYTHON_LIBRARY})
@@ -236,6 +281,10 @@ find_package(Eigen3 QUIET)
 if(EIGEN3_FOUND)
   set(HAVE_EIGEN 1)
   list(APPEND USER_INC  ${EIGEN3_INCLUDE_DIR} )
+  if(_CLANG_)
+    # Eigen causes many of these errors. Suppress.
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-register")
+  endif()
   message(STATUS "Eigen Found and Enabled")
 endif()
 
@@ -251,8 +300,9 @@ if(BUILD_PANGOLIN_VIDEO AND DC1394_FOUND)
   set(HAVE_DC1394 1)
   list(APPEND INTERNAL_INC  ${DC1394_INCLUDE_DIR} )
   list(APPEND LINK_LIBS  ${DC1394_LIBRARY} )
-  list(APPEND HEADERS ${INCDIR}/video/drivers/firewire.h ${INCDIR}/video/drivers/firewire_deinterlace.h )
-  list(APPEND SOURCES video/drivers/firewire.cpp video/drivers/firewire_deinterlace.cpp)
+  list(APPEND HEADERS ${INCDIR}/video/drivers/firewire.h ${INCDIR}/video/drivers/deinterlace.h )
+  list(APPEND SOURCES video/drivers/firewire.cpp video/drivers/deinterlace.cpp)
+  list(APPEND VIDEO_FACTORY_REG RegisterFirewireVideoFactory )
   message(STATUS "libdc1394 Found and Enabled")
 endif()
 
@@ -260,6 +310,7 @@ if(BUILD_PANGOLIN_VIDEO AND _LINUX_)
   set(HAVE_V4L 1)
   list(APPEND HEADERS ${INCDIR}/video/drivers/v4l.h)
   list(APPEND SOURCES video/drivers/v4l.cpp)
+  list(APPEND VIDEO_FACTORY_REG RegisterV4lVideoFactory )
   message(STATUS "V4L Found and Enabled")
 endif()
 
@@ -270,16 +321,39 @@ if(BUILD_PANGOLIN_VIDEO AND FFMPEG_FOUND)
   list(APPEND LINK_LIBS ${FFMPEG_LIBRARIES} )
   list(APPEND HEADERS ${INCDIR}/video/drivers/ffmpeg.h)
   list(APPEND SOURCES video/drivers/ffmpeg.cpp)
+  list(APPEND VIDEO_FACTORY_REG RegisterFfmpegVideoFactory )
+  list(APPEND VIDEO_FACTORY_REG RegisterFfmpegVideoOutputFactory )
+
+  if(_GCC_)
+    # FFMPEG is a real pain for deprecating the API.
+    set_source_files_properties(video/drivers/ffmpeg.cpp    PROPERTIES COMPILE_FLAGS "-Wno-deprecated-declarations")
+  endif()
   message(STATUS "ffmpeg Found and Enabled")
 endif()
+
+find_package(LibRealSense QUIET)
+if(BUILD_PANGOLIN_VIDEO AND LIBREALSENSE_FOUND)
+  set(HAVE_LIBREALSENSE 1)
+  list(APPEND INTERNAL_INC  ${LIBREALSENSE_INCLUDE_DIRS} )
+  list(APPEND LINK_LIBS ${LIBREALSENSE_LIBRARIES} )
+  list(APPEND HEADERS ${INCDIR}/video/drivers/realsense.h )
+  list(APPEND SOURCES video/drivers/realsense.cpp)
+  list(APPEND VIDEO_FACTORY_REG RegisterRealSenseVideoFactory )
+  message(STATUS "LibRealSense Found and Enabled")
+endif()
+
 
 find_package(OpenNI QUIET)
 if(BUILD_PANGOLIN_VIDEO AND OPENNI_FOUND)
   set(HAVE_OPENNI 1)
+  if(_LINUX_)
+    add_definitions(-Dlinux=1)
+  endif()
   list(APPEND INTERNAL_INC  ${OPENNI_INCLUDE_DIRS} )
   list(APPEND LINK_LIBS ${OPENNI_LIBRARIES} )
   list(APPEND HEADERS ${INCDIR}/video/drivers/openni.h )
   list(APPEND SOURCES video/drivers/openni.cpp)
+  list(APPEND VIDEO_FACTORY_REG RegisterOpenNiVideoFactory )
   message(STATUS "OpenNI Found and Enabled")
 endif()
 
@@ -293,6 +367,7 @@ if(BUILD_PANGOLIN_VIDEO AND OPENNI2_FOUND)
   list(APPEND LINK_LIBS ${OPENNI2_LIBRARIES} )
   list(APPEND HEADERS ${INCDIR}/video/drivers/openni2.h )
   list(APPEND SOURCES video/drivers/openni2.cpp)
+  list(APPEND VIDEO_FACTORY_REG RegisterOpenNi2VideoFactory )
   message(STATUS "OpenNI2 Found and Enabled")
 endif()
 
@@ -303,6 +378,7 @@ if(BUILD_PANGOLIN_VIDEO AND uvc_FOUND)
   list(APPEND LINK_LIBS ${uvc_LIBRARIES} )
   list(APPEND HEADERS ${INCDIR}/video/drivers/uvc.h )
   list(APPEND SOURCES video/drivers/uvc.cpp)
+  list(APPEND VIDEO_FACTORY_REG RegisterUvcVideoFactory )
   if(_WIN_)
     find_package(pthread REQUIRED QUIET)
     list(APPEND LINK_LIBS ${pthread_LIBRARIES} )
@@ -320,6 +396,7 @@ if(BUILD_PANGOLIN_VIDEO AND DepthSense_FOUND)
   list(APPEND LINK_LIBS ${DepthSense_LIBRARIES} )
   list(APPEND HEADERS ${INCDIR}/video/drivers/depthsense.h )
   list(APPEND SOURCES video/drivers/depthsense.cpp)
+  list(APPEND VIDEO_FACTORY_REG RegisterDepthSenseVideoFactory )
   message(STATUS "DepthSense Found and Enabled")
 endif()
 
@@ -330,6 +407,8 @@ if(BUILD_PANGOLIN_VIDEO AND TeliCam_FOUND)
   list(APPEND LINK_LIBS ${TeliCam_LIBRARIES} )
   list(APPEND HEADERS ${INCDIR}/video/drivers/teli.h )
   list(APPEND SOURCES video/drivers/teli.cpp )
+  list(APPEND VIDEO_FACTORY_REG RegisterTeliVideoFactory )
+
   message(STATUS "TeliCam Found and Enabled" )
 endif()
 
@@ -340,6 +419,8 @@ if(BUILD_PANGOLIN_VIDEO AND Pleora_FOUND)
   list(APPEND LINK_LIBS ${Pleora_LIBRARIES} )
   list(APPEND HEADERS ${INCDIR}/video/drivers/pleora.h )
   list(APPEND SOURCES video/drivers/pleora.cpp )
+  list(APPEND VIDEO_FACTORY_REG RegisterPleoraVideoFactory )
+
   if(_GCC_)
     # Suppress warnings generated from Pleora SDK.
     set_source_files_properties(video/drivers/pleora.cpp PROPERTIES COMPILE_FLAGS -Wno-unknown-pragmas)
@@ -441,6 +522,15 @@ configure_file(
 )
 
 #######################################################
+## Create video_drivers.h file for inclusion in library
+## This loads video driver factories based on cmake configuration
+
+CreateMethodCallFile(
+    "${CMAKE_CURRENT_BINARY_DIR}/include/${LIBRARY_NAME}/video_drivers.h"
+    "pangolin" "LoadBuiltInVideoDrivers" "${VIDEO_FACTORY_REG}"
+)
+
+#######################################################
 ## Generate Doxygen documentation target (make doc)
 find_package(Doxygen)
 if(DOXYGEN_FOUND)
@@ -501,7 +591,7 @@ install(DIRECTORY ${INCDIR}
 )
 install(TARGETS ${LIBRARY_NAME}
   EXPORT ${PROJECT_NAME}Targets
-  RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+  RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
   LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
   ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
 )

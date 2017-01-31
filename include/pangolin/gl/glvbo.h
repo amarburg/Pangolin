@@ -25,8 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef PANGOLIN_GLVBO_H
-#define PANGOLIN_GLVBO_H
+#pragma once
 
 #include <pangolin/gl/gl.h>
 
@@ -39,11 +38,9 @@ namespace pangolin
 
 void MakeTriangleStripIboForVbo(GlBuffer& ibo, int w, int h);
 
-#ifdef CALLEE_HAS_RVALREF
 GlBuffer MakeTriangleStripIboForVbo(int w, int h);
-#endif
 
-void RenderVbo(GlBuffer& vbo);
+void RenderVbo(GlBuffer& vbo, GLenum mode = GL_POINTS);
 
 void RenderVboCbo(GlBuffer& vbo, GlBuffer& cbo, bool draw_color = true);
 
@@ -87,27 +84,23 @@ inline void MakeTriangleStripIboForVbo(GlBuffer& ibo, int w, int h)
     delete[] buffer;
 }
 
-#ifdef CALLEE_HAS_RVALREF
 inline GlBuffer MakeTriangleStripIboForVbo(int w, int h)
 {
     GlBuffer ibo;
     MakeTriangleStripIboForVbo(ibo,w,h);
     return ibo;
 }
-#endif
 
-inline void RenderVbo(GlBuffer& vbo)
+inline void RenderVbo(GlBuffer& vbo, GLenum mode)
 {
     vbo.Bind();
     glVertexPointer(vbo.count_per_element, vbo.datatype, 0, 0);
     glEnableClientState(GL_VERTEX_ARRAY);
     
-    glPointSize(2.0);
-    glDrawArrays(GL_POINTS, 0, vbo.num_elements);
+    glDrawArrays(mode, 0, vbo.num_elements);
     
     glDisableClientState(GL_VERTEX_ARRAY);
     vbo.Unbind();
-    
 }
 
 inline void RenderVboCbo(GlBuffer& vbo, GlBuffer& cbo, bool draw_color)
@@ -137,7 +130,6 @@ inline void RenderVboIbo(GlBuffer& vbo, GlBuffer& ibo, bool draw_mesh)
         glDrawElements(GL_TRIANGLE_STRIP,ibo.num_elements, ibo.datatype, 0);
         ibo.Unbind();
     }else{
-        glPointSize(2.0);
         glDrawArrays(GL_POINTS, 0, vbo.num_elements);
     }
     
@@ -184,7 +176,6 @@ inline void RenderVboIboCboNbo(GlBuffer& vbo, GlBuffer& ibo, GlBuffer& cbo, GlBu
         glDrawElements(GL_TRIANGLE_STRIP,ibo.num_elements, ibo.datatype, 0);
         ibo.Unbind();
     }else{
-        glPointSize(2.0);
         glDrawArrays(GL_POINTS, 0, vbo.num_elements);
     }
     
@@ -219,7 +210,6 @@ inline void RenderVboIboNbo(GlBuffer& vbo, GlBuffer& ibo, GlBuffer& nbo, bool dr
         glDrawElements(GL_TRIANGLE_STRIP,ibo.num_elements, ibo.datatype, 0);
         ibo.Unbind();
     }else{
-        glPointSize(2.0);
         glDrawArrays(GL_POINTS, 0, vbo.num_elements);
     }
 
@@ -233,5 +223,3 @@ inline void RenderVboIboNbo(GlBuffer& vbo, GlBuffer& ibo, GlBuffer& nbo, bool dr
 }
 
 }
-
-#endif // PANGOLIN_GLVBO_H

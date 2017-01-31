@@ -23,15 +23,14 @@ Find the latest version on [Github](http://github.com/stevenlovegrove/Pangolin):
 git clone https://github.com/stevenlovegrove/Pangolin.git
 ```
 
-Current build status on [Drone.io](https://drone.io/github.com/stevenlovegrove/Pangolin)
-![Build Status](https://drone.io/github.com/stevenlovegrove/Pangolin/status.png)
-
 ## Dependencies ##
 
 Optional dependencies are enabled when found, otherwise they are silently disabled.
 Check the CMake configure output for details.
 
 ### Required Dependencies ###
+
+* C++11
 
 * OpenGL (Desktop / ES / ES2)
 
@@ -46,11 +45,6 @@ Check the CMake configure output for details.
  * (mac) sudo port install cmake
 
 ### Recommended Dependencies ###
-
-* Boost (optional with C++11. Configure with 'cmake -DCPP11_NO_BOOST=1 ..' )
- * (win) http://www.boost.org/users/download/
- * (deb) sudo apt-get install libboost-dev libboost-thread-dev libboost-filesystem-dev
- * (mac) sudo port install boost
 
 * Python2 / Python3, for drop-down interactive console
  * (win) http://www.python.org/downloads/windows
@@ -87,15 +81,14 @@ Check the CMake configure output for details.
 ## Building ##
 
 Pangolin uses the CMake portable pre-build tool. To checkout and build pangolin in the
-directory 'build', enabling C++11 support instead of using Boost, execute the
-following at a shell (or the equivelent using a GUI):
+directory 'build', execute the following at a shell (or the equivelent using a GUI):
 
 ```
 git clone https://github.com/stevenlovegrove/Pangolin.git
 cd Pangolin
 mkdir build
 cd build
-cmake -DCPP11_NO_BOOST=1 ..
+cmake ..
 make -j
 ```
 
@@ -112,3 +105,12 @@ Please visit [Github Issues](https://github.com/stevenlovegrove/Pangolin/issues)
 
 Please note; most Pangolin dependencies are optional - to disable a dependency which may be causing trouble on your machine, simply blank out it's include and library directories with a cmake configuration tool (e.g. ccmake or cmake-gui).
 
+## Acknowledgements ##
+
+I'd like to thank the growing number of kind contributors to Pangolin for helping to make it more stable and feature rich. Many features of Pangolin have been influenced by other projects such as GFlags, GLConsole, and libcvd in particular. I'd also like to thank the FOSS projects on which Pangolin depends.
+
+For a summary of those who have made code contributions, execute:
+
+```
+git shortlog -sne
+```
