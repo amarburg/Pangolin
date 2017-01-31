@@ -55,7 +55,7 @@ namespace pangolin
 /// All GLUT initialisation is taken care of. This prevents you
 /// from needing to call BindToContext() and TakeGlutCallbacks().
 PANGOLIN_EXPORT
-void CreateGlutWindowAndBind(std::string window_title, int w = 640, int h = 480, unsigned int mode = GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH );
+WindowInterface& CreateGlutWindowAndBind(std::string window_title, int w = 640, int h = 480, unsigned int mode = GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH );
 
 /// Applies any post-render events if they are defined,
 /// swaps buffers and processes events. Also resets viewport to

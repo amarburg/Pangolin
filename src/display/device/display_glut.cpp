@@ -53,22 +53,22 @@ void TakeGlutCallbacks()
     glutPassiveMotionFunc(&process::PassiveMouseMotion);
     glutSpecialFunc(&process::SpecialFunc);
     glutSpecialUpFunc(&process::SpecialFuncUp);
-    
+
 #ifdef HAVE_APPLE_OPENGL_FRAMEWORK
     glutDisplayFunc(&PangoGlutRedisplay);
-    
+
     // Attempt to register special smooth scroll callback
     // https://github.com/nanoant/osxglut
     typedef void (*glutScrollFunc_t)(void (*)(float, float));
     typedef void (*glutZoomFunc_t)(void (*)(float));
     typedef void (*glutRotateFunc_t)(void (*)(float));
     typedef void (*glutSubpixMotionFunc_t)(void (*)(float,float,float,float,float,float));
-    
+
     glutScrollFunc_t glutScrollFunc = (glutScrollFunc_t)glutGetProcAddress("glutScrollFunc");
     glutZoomFunc_t glutZoomFunc = (glutZoomFunc_t)glutGetProcAddress("glutZoomFunc");
     glutRotateFunc_t glutRotateFunc = (glutRotateFunc_t)glutGetProcAddress("glutRotateFunc");
     glutSubpixMotionFunc_t glutSubpixMotionFunc = (glutSubpixMotionFunc_t)glutGetProcAddress("glutSubpixMotionFunc");
-    
+
     if(glutScrollFunc) {
         glutScrollFunc(&process::Scroll);
     }
@@ -78,14 +78,14 @@ void TakeGlutCallbacks()
     if(glutRotateFunc) {
         glutRotateFunc(&process::Rotate);
     }
-    
+
     if(glutSubpixMotionFunc) {
         glutSubpixMotionFunc(&process::SubpixMotion);
     }
 #endif // HAVE_APPLE_OPENGL_FRAMEWORK
 }
 
-void CreateGlutWindowAndBind(std::string window_title, int w, int h, unsigned int mode)
+WindowInterface& CreateGlutWindowAndBind(std::string window_title, int w, int h, unsigned int mode)
 {
 #ifdef HAVE_FREEGLUT
     if( glutGet(GLUT_INIT_STATE) == 0)
@@ -102,7 +102,7 @@ void CreateGlutWindowAndBind(std::string window_title, int w, int h, unsigned in
 #ifdef HAVE_GLEW
     glewInit();
 #endif
-    
+
 #ifdef HAVE_FREEGLUT
     glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS);
 #endif
@@ -112,23 +112,25 @@ void CreateGlutWindowAndBind(std::string window_title, int w, int h, unsigned in
 
     context->is_double_buffered = (mode & GLUT_DOUBLE) != 0;
     TakeGlutCallbacks();
+
+    return *context;
 }
 
 void SwapGlutBuffersProcessGlutEvents()
 {
     glutSwapBuffers();
-    
+
 #ifdef HAVE_FREEGLUT
     glutMainLoopEvent();
 #endif
-    
+
 #ifdef HAVE_GLUT_APPLE_FRAMEWORK
     glutCheckLoop();
 #endif
 }
 
 void FinishGlutFrame()
-{    
+{
     RenderViews();
     PostRender();
     SwapGlutBuffersProcessGlutEvents();
@@ -136,29 +138,29 @@ void FinishGlutFrame()
 }
 
 // Implement platform agnostic version
-void CreateWindowAndBind(std::string window_title, int w, int h, const Params& /*params*/ )
+WindowInterface& CreateWindowAndBind(std::string window_title, int w, int h, const Params& /*params*/ )
 {
-    CreateGlutWindowAndBind(window_title, w, h);
+    return CreateGlutWindowAndBind(window_title, w, h);
 }
 
 // Implement platform agnostic version
-void FinishFrame()
-{
-    FinishGlutFrame();
-}
+// void FinishFrame()
+// {
+//     FinishGlutFrame();
+// }
 
-void SetFullscreen(bool fullscreen)
-{
-    if( fullscreen != context->is_fullscreen )
-    {
-        if(fullscreen) {
-            glutFullScreen();
-        }else{
-            glutReshapeWindow(context->windowed_size[0],context->windowed_size[1]);
-        }
-        context->is_fullscreen = fullscreen;
-    }
-}
+// void SetFullscreen(bool fullscreen)
+// {
+//     if( fullscreen != context->is_fullscreen )
+//     {
+//         if(fullscreen) {
+//             glutFullScreen();
+//         }else{
+//             glutReshapeWindow(context->windowed_size[0],context->windowed_size[1]);
+//         }
+//         context->is_fullscreen = fullscreen;
+//     }
+// }
 
 void PangolinPlatformInit(PangolinGl& /*context*/)
 {
