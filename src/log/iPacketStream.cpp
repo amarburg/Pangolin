@@ -124,13 +124,14 @@ void iPacketStream::init()
 
     for (auto i : PANGO_MAGIC)
     {
-        if (_stream.get() != i || !_stream.good())
-            throw runtime_error("Unrecognised or corrupted file header.");
+        if (_stream.get() != i)
+            throw runtime_error("Unrecognised file header.");
+        if (!_stream.good())
+            throw runtime_error("Bad stream");
     }
 
     setupIndex();
     parseHeader();
-
     while (peekTag() == TAG_ADD_SOURCE)
         parseNewSource();
 }

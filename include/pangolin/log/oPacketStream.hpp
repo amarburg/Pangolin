@@ -13,9 +13,9 @@ namespace pangolin
 class PANGOLIN_EXPORT oPacketStream
 {
     private:
-	threadedfilebuf _buffer;
-	std::ostream _stream;
-	bool _indexable, _open;
+    threadedfilebuf _buffer;
+    std::ostream _stream;
+    bool _indexable, _open;
 
 	sourceIndexType _sources;
 	packetIndex _index;
@@ -29,16 +29,18 @@ class PANGOLIN_EXPORT oPacketStream
 	    writeHeader();
 	};
 
-	void close() //does not write footer or index.
-	{
-	    if (_open)
-	    {
-		_buffer.close();
-		_open = false;
-	    }
-	    _sources.clear();
-	};
-	void forceClose()
+    void close()
+    {
+        if (_open)
+        {
+            if (_indexable)
+                writeEnd();
+            _buffer.close();
+            _open = false;
+        }
+    }
+
+	void forceClose() //does not write footer or index.
 	{
 	    if (_open)
 	    {
@@ -55,6 +57,7 @@ class PANGOLIN_EXPORT oPacketStream
 	    _buffer.open(filename, buffer_size);
 	    _open = _stream.good();
 	    _bytes_written = 0;
+	    _indexable = !IsPipe(filename);
 	    writeHeader();
 	}
 
@@ -71,11 +74,11 @@ class PANGOLIN_EXPORT oPacketStream
 
 //    private:
 	void writeHeader();
-	void write(PacketStreamSourceId, const PacketStreamSource&);
+	void write(const PacketStreamSource&);
 	void writeMeta(PacketStreamSourceId src, const json::value& data);
 };
 
 
 }
 
-#undef DEBUG_CHECKPOINT
+
