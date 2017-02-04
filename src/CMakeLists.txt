@@ -62,6 +62,8 @@ if(BUILD_PANGOLIN_VIDEO)
   append_glob(HEADERS ${INCDIR}/video/*.h*)
   append_glob(SOURCES video/*.cpp)
 
+  add_definitions( -DPANGOLIN_VIDEO )
+
   # Generic video drivers
   list(APPEND HEADERS
     ${INCDIR}/video/drivers/test.h

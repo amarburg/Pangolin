@@ -83,10 +83,11 @@ PixelFormat TgaFormat(int depth, int color_type, int color_map)
             }
         }
     }
-    throw std::runtime_error("Unsupported TGA format");    
+    throw std::runtime_error("Unsupported TGA format");
 }
 
 
+#ifdef PANGOLIN_VIDEO
 
 TypedImage LoadFromVideo(const std::string& uri)
 {
@@ -123,6 +124,8 @@ void SaveToVideo(const Image<unsigned char>& image, const pangolin::PixelFormat&
     video->SetStreams({stream});
     video->WriteStreams(image.ptr);
 }
+
+#endif
 
 TypedImage LoadTga(const std::string& filename)
 {
@@ -275,7 +278,7 @@ void SavePng(const Image<unsigned char>& image, const pangolin::PixelFormat& fmt
     PANGOLIN_UNUSED(image);
     PANGOLIN_UNUSED(filename);
     PANGOLIN_UNUSED(top_line_first);
-    
+
     // Check image has supported bit depth
     for(unsigned int i=1; i < fmt.channels; ++i) {
         if( fmt.channel_bits[i] != fmt.channel_bits[0] ) {
@@ -431,7 +434,7 @@ TypedImage LoadJpg(const std::string& filename)
         return img;
     }
     throw std::runtime_error("Unable to load JPEG file, '" + filename + "'");
-#else   
+#else
     throw std::runtime_error("JPEG Support not enabled. Please rebuild Pangolin.");
 #endif
 }
@@ -447,7 +450,7 @@ PixelFormat PpmFormat(const std::string& strType, int num_colours)
     }else if(strType == "P6") {
         return PixelFormatFromString("RGB24");
     }else{
-        throw std::runtime_error("Unsupported PPM/PGM format");        
+        throw std::runtime_error("Unsupported PPM/PGM format");
     }
 }
 
@@ -475,7 +478,7 @@ TypedImage LoadPpm(std::ifstream& bFile)
     PpmConsumeWhitespaceAndComments(bFile);
     bFile >> num_colors;
     bFile.ignore(1,'\n');
-    
+
     if(!bFile.fail() && w > 0 && h > 0) {
         TypedImage img(w, h, PpmFormat(ppm_type, num_colors) );
 
@@ -524,7 +527,7 @@ void SaveExr(const Image<unsigned char>& image_in, const pangolin::PixelFormat& 
     PANGOLIN_UNUSED(fmt);
     PANGOLIN_UNUSED(filename);
     PANGOLIN_UNUSED(top_line_first);
-    
+
 #ifdef HAVE_OPENEXR
     ManagedImage<unsigned char> flip_image;
     Image<unsigned char> image;
@@ -583,8 +586,10 @@ TypedImage LoadImage(const std::string& filename, ImageFileType file_type)
         return LoadJpg(filename);
     case ImageFileTypePpm:
         return LoadPpm(filename);
+#ifdef PANGOLIN_VIDEO
     case ImageFileTypePango:
         return LoadFromVideo(filename);
+#endif
     default:
         throw std::runtime_error("Unsupported image file type, '" + filename + "'");
     }
@@ -622,8 +627,10 @@ void SaveImage(const Image<unsigned char>& image, const pangolin::PixelFormat& f
         return SavePng(image, fmt, filename, top_line_first);
     case ImageFileTypeExr:
         return SaveExr(image, fmt, filename, top_line_first);
+#ifdef PANGOLIN_VIDEO
     case ImageFileTypePango:
         return SaveToVideo(image, fmt, filename, top_line_first);
+#endif
     default:
         throw std::runtime_error("Unsupported image file type, '" + filename + "'");
     }
