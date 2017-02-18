@@ -97,7 +97,7 @@ WindowInterface& CreateGlutWindowAndBind(std::string window_title, int w, int h,
     }
     glutInitWindowSize(w,h);
     glutCreateWindow(window_title.c_str());
-    BindToContext(window_title);
+    context = static_cast<pangolin::PangolinGl *>(&BindToContext(window_title));
 
 #ifdef HAVE_GLEW
     glewInit();
