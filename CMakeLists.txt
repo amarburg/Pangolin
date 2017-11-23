@@ -1,5 +1,13 @@
-cmake_minimum_required(VERSION 2.6)
-project("Pangolin")
+if (NOT FIPS_IMPORT)
+  cmake_minimum_required(VERSION 3.5.0)
+
+  get_filename_component(FIPS_ROOT_DIR "../fips" ABSOLUTE)
+  include("${FIPS_ROOT_DIR}/cmake/fips.cmake")
+
+  fips_setup(PROJECT Pangolin)
+endif()
+
+
 set(PANGOLIN_VERSION_MAJOR 0)
 set(PANGOLIN_VERSION_MINOR 5)
 set(PANGOLIN_VERSION ${PANGOLIN_VERSION_MAJOR}.${PANGOLIN_VERSION_MINOR})
@@ -87,7 +95,7 @@ endif()
 
 string(TOLOWER ${PROJECT_NAME} LIBRARY_NAME)
 
-# make an uninstall target 
+# make an uninstall target
 configure_file(
  	"${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
   	"${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
@@ -97,12 +105,18 @@ configure_file(
 add_custom_target(uninstall
   "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake")
 
-add_subdirectory("external")
-add_subdirectory("src")
-add_subdirectory("test")
+fips_include_directories( "${FIPS_PROJECT_BUILD_DIR}/include/" )
+
+fips_add_subdirectory("external")
+fips_add_subdirectory("src")
+fips_add_subdirectory("test")
 
 if(BUILD_EXAMPLES)
   set(Pangolin_DIR ${Pangolin_BINARY_DIR}/src)
   add_subdirectory(examples)
   add_subdirectory(tools)
+endif()
+
+if( NOT FIPS_IMPORT )
+  fips_finish()
 endif()

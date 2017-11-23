@@ -490,126 +490,135 @@ include_directories( ${LIB_INC_DIR} )
 include_directories( ${USER_INC} )
 include_directories( ${INTERNAL_INC} )
 
-add_library(${LIBRARY_NAME} ${SOURCES} ${HEADERS})
-target_link_libraries(${LIBRARY_NAME} ${LINK_LIBS})
+fips_begin_module(${LIBRARY_NAME})
+  fips_files( ${SOURCES} ${HEADERS} )
+  fips_libs(  ${LINK_LIBS} )
+# add_library(${LIBRARY_NAME} ${SOURCES} ${HEADERS})
+# target_link_libraries(${LIBRARY_NAME} ${LINK_LIBS})
+
+fips_end_module()
 
 ## Generate symbol export helper header on MSVC
-IF(MSVC)
-    string(TOUPPER ${LIBRARY_NAME} LIBRARY_NAME_CAPS)
-    include(GenerateExportHeader)
-    GENERATE_EXPORT_HEADER( ${LIBRARY_NAME}
-        BASE_NAME ${LIBRARY_NAME_CAPS}
-        EXPORT_MACRO_NAME ${LIBRARY_NAME_CAPS}_EXPORT
-        EXPORT_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/include/${LIBRARY_NAME}/${LIBRARY_NAME}_export.h"
-        STATIC_DEFINE ${LIBRARY_NAME_CAPS}_BUILT_AS_STATIC
-    )
-ENDIF()
+# IF(MSVC)
+#     string(TOUPPER ${LIBRARY_NAME} LIBRARY_NAME_CAPS)
+#     include(GenerateExportHeader)
+#     GENERATE_EXPORT_HEADER( ${LIBRARY_NAME}
+#         BASE_NAME ${LIBRARY_NAME_CAPS}
+#         EXPORT_MACRO_NAME ${LIBRARY_NAME_CAPS}_EXPORT
+#         EXPORT_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/include/${LIBRARY_NAME}/${LIBRARY_NAME}_export.h"
+#         STATIC_DEFINE ${LIBRARY_NAME_CAPS}_BUILT_AS_STATIC
+#     )
+# ENDIF()
+#
+# IF(CMAKE_MACOSX_RPATH)
+# 	set_target_properties( ${LIBRARY_NAME}
+# 	   PROPERTIES
+# 	   INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib
+# 	   INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/lib )
+# ENDIF()
+#
+# ## Set Special Compiler flags
+# if(MSVC)
+#   set(CMAKE_CXX_FLAGS "/EHs ${CMAKE_CXX_FLAGS}")
+# elseif(CMAKE_COMPILER_IS_GNUCXX)
+#   set(CMAKE_CXX_FLAGS "-Wall -Wno-error=deprecated-declarations ${CMAKE_CXX_FLAGS}")
+# endif()
+#
+# #######################################################
+# ## Create config.h file for inclusion in library
 
-IF(CMAKE_MACOSX_RPATH)
-	set_target_properties( ${LIBRARY_NAME}
-	   PROPERTIES
-	   INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib
-	   INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/lib )
-ENDIF()
-
-## Set Special Compiler flags
-if(MSVC)
-  set(CMAKE_CXX_FLAGS "/EHs ${CMAKE_CXX_FLAGS}")
-elseif(CMAKE_COMPILER_IS_GNUCXX)
-  set(CMAKE_CXX_FLAGS "-Wall -Wno-error=deprecated-declarations ${CMAKE_CXX_FLAGS}")
-endif()
-
-#######################################################
-## Create config.h file for inclusion in library
-
+set( CONFIG_DIR  "${FIPS_PROJECT_BUILD_DIR}/include/${LIBRARY_NAME}" )
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/config.h.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/include/${LIBRARY_NAME}/config.h"
+  "${CONFIG_DIR}/config.h"
 )
 
-#######################################################
-## Create video_drivers.h file for inclusion in library
-## This loads video driver factories based on cmake configuration
+message( STATUS "config.h created in ${CONFIG_DIR}")
+fips_include_directories( "${FIPS_PROJECT_BUILD_DIR}/include/" )
+
+# #######################################################
+# ## Create video_drivers.h file for inclusion in library
+# ## This loads video driver factories based on cmake configuration
 
 CreateMethodCallFile(
-    "${CMAKE_CURRENT_BINARY_DIR}/include/${LIBRARY_NAME}/video_drivers.h"
+    "${FIPS_PROJECT_BUILD_DIR}/include/${LIBRARY_NAME}/video_drivers.h"
     "pangolin" "LoadBuiltInVideoDrivers" "${VIDEO_FACTORY_REG}"
 )
 
-#######################################################
-## Generate Doxygen documentation target (make doc)
-find_package(Doxygen)
-if(DOXYGEN_FOUND)
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
-    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../doc )
-    add_custom_target(doc
-        ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../doc
-        COMMENT "Generating API documentation with Doxygen" VERBATIM
-    )
-endif()
-
-#######################################################
-
-# This relative path allows installed files to be relocatable.
-set( CMAKECONFIG_INSTALL_DIR lib/cmake/${PROJECT_NAME} )
-file( RELATIVE_PATH REL_INCLUDE_DIR
-    "${CMAKE_INSTALL_PREFIX}/${CMAKECONFIG_INSTALL_DIR}"
-    "${CMAKE_INSTALL_PREFIX}/include"
-)
-
-# Export library for easy inclusion from other cmake projects. APPEND allows
-# call to function even as subdirectory of larger project.
-FILE(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Targets.cmake")
-export( TARGETS ${LIBRARY_NAME}
-        APPEND FILE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Targets.cmake" )
-
-# Version information
-configure_file(${PROJECT_NAME}ConfigVersion.cmake.in
-  "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake" @ONLY)
-
-# Build tree config
-set( EXPORT_LIB_INC_DIR ${LIB_INC_DIR} )
-configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}Config.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake @ONLY IMMEDIATE )
-
-# Install tree config
-set( EXPORT_LIB_INC_DIR "\${PROJECT_CMAKE_DIR}/${REL_INCLUDE_DIR}" )
-configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}Config.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/${PROJECT_NAME}Config.cmake @ONLY )
-
-# Add package to CMake package registery for use from the build tree
-option( EXPORT_${PROJECT_NAME}
-  "Should the ${PROJECT_NAME} package be exported for use by other software" ON )
-
-if( EXPORT_${PROJECT_NAME} )
-  export( PACKAGE ${PROJECT_NAME} )
-endif()
-
-#######################################################
-## Install headers / targets
-
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/${LIBRARY_NAME}/config.h"
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/include/${LIBRARY_NAME}
-)
-install(DIRECTORY ${INCDIR}
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/include
-)
-install(TARGETS ${LIBRARY_NAME}
-  EXPORT ${PROJECT_NAME}Targets
-  RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
-  LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
-)
-
-#######################################################
-## Install CMake config
-
-install(
-    FILES "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/${PROJECT_NAME}Config.cmake"
-          "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-    DESTINATION ${CMAKECONFIG_INSTALL_DIR}
-)
-install(
-    EXPORT ${PROJECT_NAME}Targets DESTINATION ${CMAKECONFIG_INSTALL_DIR}
-)
+# #######################################################
+# ## Generate Doxygen documentation target (make doc)
+# find_package(Doxygen)
+# if(DOXYGEN_FOUND)
+#     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
+#     file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../doc )
+#     add_custom_target(doc
+#         ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+#         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../doc
+#         COMMENT "Generating API documentation with Doxygen" VERBATIM
+#     )
+# endif()
+#
+# #######################################################
+#
+# # This relative path allows installed files to be relocatable.
+# set( CMAKECONFIG_INSTALL_DIR lib/cmake/${PROJECT_NAME} )
+# file( RELATIVE_PATH REL_INCLUDE_DIR
+#     "${CMAKE_INSTALL_PREFIX}/${CMAKECONFIG_INSTALL_DIR}"
+#     "${CMAKE_INSTALL_PREFIX}/include"
+# )
+#
+# # Export library for easy inclusion from other cmake projects. APPEND allows
+# # call to function even as subdirectory of larger project.
+# FILE(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Targets.cmake")
+# export( TARGETS ${LIBRARY_NAME}
+#         APPEND FILE "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Targets.cmake" )
+#
+# # Version information
+# configure_file(${PROJECT_NAME}ConfigVersion.cmake.in
+#   "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake" @ONLY)
+#
+# # Build tree config
+# set( EXPORT_LIB_INC_DIR ${LIB_INC_DIR} )
+# configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}Config.cmake.in
+#     ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake @ONLY IMMEDIATE )
+#
+# # Install tree config
+# set( EXPORT_LIB_INC_DIR "\${PROJECT_CMAKE_DIR}/${REL_INCLUDE_DIR}" )
+# configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}Config.cmake.in
+#     ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/${PROJECT_NAME}Config.cmake @ONLY )
+#
+# # Add package to CMake package registery for use from the build tree
+# option( EXPORT_${PROJECT_NAME}
+#   "Should the ${PROJECT_NAME} package be exported for use by other software" ON )
+#
+# if( EXPORT_${PROJECT_NAME} )
+#   export( PACKAGE ${PROJECT_NAME} )
+# endif()
+#
+# #######################################################
+# ## Install headers / targets
+#
+# install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/${LIBRARY_NAME}/config.h"
+#   DESTINATION ${CMAKE_INSTALL_PREFIX}/include/${LIBRARY_NAME}
+# )
+# install(DIRECTORY ${INCDIR}
+#   DESTINATION ${CMAKE_INSTALL_PREFIX}/include
+# )
+# install(TARGETS ${LIBRARY_NAME}
+#   EXPORT ${PROJECT_NAME}Targets
+#   RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+#   LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+#   ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+# )
+#
+# #######################################################
+# ## Install CMake config
+#
+# install(
+#     FILES "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/${PROJECT_NAME}Config.cmake"
+#           "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+#     DESTINATION ${CMAKECONFIG_INSTALL_DIR}
+# )
+# install(
+#     EXPORT ${PROJECT_NAME}Targets DESTINATION ${CMAKECONFIG_INSTALL_DIR}
+# )

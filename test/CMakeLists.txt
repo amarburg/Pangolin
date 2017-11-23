@@ -1,1 +1,1 @@
-add_subdirectory("log")
+fips_add_subdirectory("log")
