@@ -527,7 +527,7 @@ fips_end_module()
 # #######################################################
 # ## Create config.h file for inclusion in library
 
-set( CONFIG_DIR  "${FIPS_PROJECT_BUILD_DIR}/include/${LIBRARY_NAME}" )
+set( CONFIG_DIR  "${FIPS_PROJECT_BUILD_DIR}/include/pangolin" )
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/config.h.in"
   "${CONFIG_DIR}/config.h"
@@ -541,7 +541,7 @@ fips_include_directories( "${FIPS_PROJECT_BUILD_DIR}/include/" )
 # ## This loads video driver factories based on cmake configuration
 
 CreateMethodCallFile(
-    "${FIPS_PROJECT_BUILD_DIR}/include/${LIBRARY_NAME}/video_drivers.h"
+    "${FIPS_PROJECT_BUILD_DIR}/include/pangolin/video_drivers.h"
     "pangolin" "LoadBuiltInVideoDrivers" "${VIDEO_FACTORY_REG}"
 )
 

@@ -1,1 +1,8 @@
+exports:
+  header-dirs:
+    - include/
+  modules:
+    pangolin: .
 
+defines:
+  FIPS_EXCEPTIONS: ON
