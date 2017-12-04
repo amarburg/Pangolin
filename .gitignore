@@ -6,3 +6,4 @@ debug
 CMakeLists.txt.user
 .AppleDouble
 .fips-*
+.wercker/
