@@ -490,7 +490,7 @@ include_directories( ${LIB_INC_DIR} )
 include_directories( ${USER_INC} )
 include_directories( ${INTERNAL_INC} )
 
-fips_begin_module(${LIBRARY_NAME})
+fips_begin_module(pangolin)
   fips_files( ${SOURCES} ${HEADERS} )
   fips_libs(  ${LINK_LIBS} )
 # add_library(${LIBRARY_NAME} ${SOURCES} ${HEADERS})
