@@ -18,13 +18,18 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/CMakeMod
 include(SetPlatformVars)
 
 SET(CPACK_GENERATOR "DEB")
+
 SET(CPACK_DEBIAN_PACKAGE_MAINTAINER "Steven Lovegrove")
 SET(CPACK_PACKAGE_VERSION_MAJOR ${PANGOLIN_VERSION_MAJOR})
 SET(CPACK_PACKAGE_VERSION_MINOR ${PANGOLIN_VERSION_MINOR})
 SET(CPACK_PACKAGE_VERSION_PATCH "0")
 include(CPack)
 
-option( BUILD_EXAMPLES "Build Examples" OFF )
+option( BUILD_TESTS "Build Tests" OFF )
+option( BUILD_TOOLS "Build Examples" OFF )
+option( BUILD_EXAMPLES "Build Tools" OFF )
+
+set (CMAKE_CXX_STANDARD 14)
 
 if(_WIN_)
     option( BUILD_SHARED_LIBS    "Build Shared Library" OFF)
@@ -97,26 +102,29 @@ string(TOLOWER ${PROJECT_NAME} LIBRARY_NAME)
 
 # make an uninstall target
 configure_file(
- 	"${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
-  	"${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
-  	IMMEDIATE @ONLY
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+    IMMEDIATE @ONLY
 )
 
-add_custom_target(uninstall
+add_custom_target(pangolin_uninstall
   "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake")
 
-fips_include_directories( "${FIPS_PROJECT_BUILD_DIR}/include/" )
+fips_include_directories( "include/" "${FIPS_PROJECT_BUILD_DIR}/include/" )
 
 fips_add_subdirectory("external")
 fips_add_subdirectory("src")
-fips_add_subdirectory("test")
 
 if(BUILD_EXAMPLES)
-  set(Pangolin_DIR ${Pangolin_BINARY_DIR}/src)
-  add_subdirectory(examples)
-  add_subdirectory(tools)
+    set(Pangolin_DIR ${Pangolin_BINARY_DIR}/src)
+    add_subdirectory(examples)
 endif()
 
 if( NOT FIPS_IMPORT )
+
+  if( BUILD_TESTS )
+    fips_add_subdirectory("test")
+  endif()
+
   fips_finish()
 endif()
