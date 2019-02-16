@@ -292,7 +292,7 @@ if(BUILD_PANGOLIN_PYTHON AND BUILD_PANGOLIN_GUI AND BUILD_PANGOLIN_VARS AND NOT 
 
     # pybind11 stuff
     list(APPEND INTERNAL_INC ${PYBIND11_INCLUDE_DIR})
-    list(APPEND LINK_LIBS PRIVATE ${pybind11_LIBRARIES})
+    list(APPEND LINK_LIBS ${pybind11_LIBRARIES})
 
     if(_GCC_)
         set_source_files_properties(python/PyInterpreter.cpp    PROPERTIES COMPILE_FLAGS "-Wno-missing-field-initializers")
@@ -606,6 +606,9 @@ fips_begin_module(pangolin)
   fips_libs(  ${LINK_LIBS} )
 # add_library(${LIBRARY_NAME} ${SOURCES} ${HEADERS})
 # target_link_libraries(${LIBRARY_NAME} ${LINK_LIBS})
+
+  message(STATUS ${CurTargetName} )
+  message(STATUS ${CurLinkLibs} )
 
 fips_end_module()
 
